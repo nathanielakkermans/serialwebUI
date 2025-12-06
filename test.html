@@ -158,12 +158,24 @@
                 </button>
             </div>
 
-            <!-- Tijdschaal Knoppen -->
-            <div id="timescaleButtons" class="flex justify-center space-x-2 mb-4">
-                <button onclick="updateChart('60000')" data-duration="60000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-indigo-600 text-white">1 Minuut</button>
-                <button onclick="updateChart('300000')" data-duration="300000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">5 Minuten</button>
-                <button onclick="updateChart('900000')" data-duration="900000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">15 Minuten</button>
+            <div class="flex justify-between items-center mb-4">
+                <!-- Tijdschaal Knoppen -->
+                <div id="timescaleButtons" class="flex justify-start space-x-2">
+                    <button onclick="updateChart('60000')" data-duration="60000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-indigo-600 text-white">1 Minuut</button>
+                    <button onclick="updateChart('300000')" data-duration="300000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">5 Minuten</button>
+                    <button onclick="updateChart('900000')" data-duration="900000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">15 Minuten</button>
+                </div>
+                
+                <!-- CSV Export Knop -->
+                <button id="exportCsvButton" onclick="downloadRawSelectedData()"
+                        class="px-4 py-1 bg-emerald-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-emerald-600 transition duration-150 ease-in-out disabled:opacity-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 11.586V3a1 1 0 112 0v8.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                    Exporteer Geselecteerde Data
+                </button>
             </div>
+
 
             <!-- Grafiek Canvas -->
             <div class="relative h-96">
@@ -438,7 +450,6 @@
 
                     if (sensor.type === 'text') {
                         // --- TEKST BERICHT KAART RENDERING ---
-                        // FIX: Zorg ervoor dat de laatste entry correct wordt opgehaald en gecontroleerd.
                         const latestEntry = sensor.history.length > 0 ? sensor.history[sensor.history.length - 1] : null;
                         const latestMessage = latestEntry ? latestEntry.value : 'Geen bericht ontvangen';
                         const latestTime = latestEntry ? new Date(latestEntry.time).toLocaleTimeString('nl-NL') : 'N/A';
@@ -451,7 +462,6 @@
                             sensorCardEl.className = `message-card bg-white p-4 rounded-lg shadow border-2 border-gray-200 transition duration-150 ease-in-out`;
                             sensorCardEl.innerHTML = `
                                 <div class="flex justify-between items-start">
-                                    <!-- (Log) verwijderd -->
                                     <p class="text-sm font-semibold text-gray-500 mb-1">${sensor.name}</p>
                                     <span id="${sensorId}-time" class="text-xs text-gray-400">${latestTime}</span>
                                 </div>
@@ -467,8 +477,6 @@
                             
                             if (messageEl) messageEl.textContent = latestMessage;
                             if (timeEl) timeEl.textContent = latestTime;
-                            
-                            // Geen update meer voor de logboek teller
                         }
                     } else {
                         // --- NUMERIEKE SENSOR KAART RENDERING (Bestaande logica) ---
@@ -482,8 +490,8 @@
                         const chartIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart ${isSelected ? 'text-emerald-500' : 'text-gray-400'}"><path d="M3 3v18h18"/><path d="m18 8-5 5-4-4-5 5"/></svg>`;
 
                         if (!sensorCardEl || sensorCardEl.classList.contains('message-card')) {
-                            // Creëer NIEUWE numerieke kaart of vervang oude tekstkaart (dit zou niet mogen gebeuren in de praktijk)
-                            if (sensorCardEl) sensorCardEl.remove(); // Verwijder de oude kaart als deze bestaat en verkeerd is
+                            // Creëer NIEUWE numerieke kaart of vervang oude tekstkaart
+                            if (sensorCardEl) sensorCardEl.remove();
 
                             sensorCardEl = document.createElement('div');
                             sensorCardEl.id = sensorId;
@@ -889,7 +897,6 @@
             // 1. Maak datasets voor elke geselecteerde sensor
             selectedSensors.forEach((sRef, index) => {
                 const sensor = getSensorByKey(makeSensorKey(sRef.category, sRef.name));
-                // Controleer nogmaals of het een numerieke sensor is (zou moeten zijn, maar voor de zekerheid)
                 if (!sensor || sensor.type !== 'numeric') return; 
 
                 const filteredData = sensor.history.filter(point => point.time >= timeLimit);
@@ -937,7 +944,7 @@
             } else {
                 const ctx = document.getElementById('sensorChart').getContext('2d');
                 activeChart = new Chart(ctx, {
-                    type: 'line',
+                    type: 'line', // Zorg ervoor dat het een lijngrafiek blijft
                     data: {
                         labels: allLabels,
                         datasets: datasets
@@ -991,6 +998,93 @@
             });
             document.querySelector(`#timescaleButtons button[data-duration="${durationMs}"]`).classList.add('bg-indigo-600', 'text-white', 'shadow-md');
         };
+        
+        // ------------------------------------------------------------------
+        // CSV EXPORT LOGICA
+        // ------------------------------------------------------------------
+
+        /**
+         * Downloadt de volledige ruwe historische data voor alle geselecteerde sensoren.
+         */
+        window.downloadRawSelectedData = function() {
+            if (selectedSensors.length === 0) {
+                showMessage("Geen sensoren geselecteerd om te exporteren.", true);
+                return;
+            }
+
+            const csvRows = [];
+            // CSV Headers
+            // We gebruiken een gedetailleerde, onafhankelijke tijdstempel plus leesbare tijd
+            csvRows.push("Timestamp (ms),Tijd (ISO),Categorie,Naam,Waarde,Eenheid");
+
+            let allDataPoints = [];
+
+            // 1. Verzamel alle historische data voor geselecteerde sensoren
+            selectedSensors.forEach(sRef => {
+                const sensor = getSensorByKey(makeSensorKey(sRef.category, sRef.name));
+                if (sensor && sensor.type === 'numeric') {
+                    // Gebruik de volledige historie, ongeacht de huidige grafiek filtering
+                    sensor.history.forEach(point => {
+                        allDataPoints.push({
+                            time: point.time,
+                            category: sRef.category,
+                            name: sRef.name,
+                            value: point.value,
+                            unit: sensor.unit || '',
+                        });
+                    });
+                }
+            });
+            
+            if (allDataPoints.length === 0) {
+                 showMessage("Geen datapunten in de geschiedenis om te exporteren.", true);
+                 return;
+            }
+
+            // 2. Sorteer alle punten op tijdstempel
+            allDataPoints.sort((a, b) => a.time - b.time);
+
+            // 3. Converteer naar CSV-rijen
+            allDataPoints.forEach(p => {
+                // Gebruik ISO-tijd voor een eenduidige, wereldwijde tijdsaanduiding
+                const timeString = new Date(p.time).toISOString(); 
+                
+                // Zorg ervoor dat strings (categorie/naam/eenheid) correct worden geciteerd en escapet
+                const row = [
+                    p.time,
+                    timeString,
+                    `"${p.category.replace(/"/g, '""')}"`,
+                    `"${p.name.replace(/"/g, '""')}"`,
+                    p.value,
+                    `"${p.unit.replace(/"/g, '""')}"`
+                ].join(',');
+                
+                csvRows.push(row);
+            });
+
+            const csvString = csvRows.join('\n');
+            
+            // 4. Download logic
+            const now = new Date();
+            const dateString = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+            const filename = `SensorData_Export_${dateString}.csv`;
+            
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showMessage(`Data van ${allDataPoints.length} punten geëxporteerd naar ${filename}`, false);
+            } else {
+                showMessage("Download is niet ondersteund in deze browser.", true);
+            }
+        }
+
 
         // Initieel de UI renderen en de vervaging aanzetten
         updateSensorDisplays();
