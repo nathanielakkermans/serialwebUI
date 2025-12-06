@@ -44,12 +44,18 @@
             box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3); 
         }
 
-        /* NIEUWE STIJL VOOR STERKERE VERVAGING BIJ DISCONNECTIE */
+        /* STERKERE VERVAGING BIJ DISCONNECTIE */
         .data-stale .sensor-card {
-            opacity: 0.3; /* Verlaagd van 0.5 */
-            filter: blur(1.5px); /* Verhoogd van 0.7px */
+            opacity: 0.3; 
+            filter: blur(1.5px); 
             transition: opacity 0.5s, filter 0.5s;
         }
+        .data-stale .message-card {
+            opacity: 0.3; 
+            filter: blur(1.5px); 
+            transition: opacity 0.5s, filter 0.5s;
+        }
+
 
         /* Stijl voor de zwevende melding (Toast) */
         #toastNotification {
@@ -84,7 +90,7 @@
             <!-- Titel -->
             <div>
                 <h1 class="text-3xl font-extrabold text-indigo-700">Seriële Sensor Data Viewer</h1>
-                <p class="text-gray-500 mt-1">Dynamische sensorwaarden via seriële poort.</p>
+                <p class="text-gray-500 mt-1">Dynamische sensorwaarden en berichten via seriële poort.</p>
             </div>
 
             <!-- Instellingen, Status en Knoppen (Rechtsboven) -->
@@ -223,7 +229,7 @@
         let sensorData = {}; // { "CategoryName": [sensor1, sensor2, ...], ... }
         let selectedSensors = []; // Array van { category, name } objecten
         let toastTimeout = null;
-        let isConnected = false; // NIEUWE STATE: Houdt de verbindingsstatus bij
+        let isConnected = false; // Houdt de verbindingsstatus bij
 
         const statusMessageEl = document.getElementById('statusMessage');
         const connectButton = document.getElementById('connectButton');
@@ -373,6 +379,14 @@
          */
         function toggleSensorSelection(category, name) {
             const key = makeSensorKey(category, name);
+            const sensor = getSensorByKey(key);
+            
+            // Alleen numerieke sensoren toestaan in de grafiek
+            if (sensor && sensor.type === 'text') {
+                 showMessage("Alleen numerieke sensorwaarden kunnen worden geselecteerd voor de grafiek.", true);
+                 return;
+            }
+
             const index = selectedSensors.findIndex(s => makeSensorKey(s.category, s.name) === key);
 
             if (index > -1) {
@@ -384,7 +398,7 @@
             }
 
             updateChartButtonState();
-            updateSensorDisplays(); // Om de kaart visueel bij te werken
+            updateSensorDisplays(); // Zorgt voor het visueel deselecteren van de kaarten
         }
 
 
@@ -421,63 +435,104 @@
                 sensors.forEach(sensor => {
                     const sensorId = makeSensorId(category, sensor.name);
                     let sensorCardEl = document.getElementById(sensorId);
-                    const isSelected = selectedSensors.some(s => makeSensorKey(s.category, s.name) === makeSensorKey(category, sensor.name));
-                    
-                    const valueColor = sensor.value > (sensor.maxRange * 0.8) ? 'text-red-600' : 'text-green-600';
-                    const unitText = sensor.unit ? sensor.unit : '';
 
-                    // Icoon SVG voor een grafiek (Groen als geselecteerd, anders grijs)
-                    const chartIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart ${isSelected ? 'text-emerald-500' : 'text-gray-400'}"><path d="M3 3v18h18"/><path d="m18 8-5 5-4-4-5 5"/></svg>`;
-
-                    if (!sensorCardEl) {
-                        // Creëer NIEUWE kaart
-                        sensorCardEl = document.createElement('div');
-                        sensorCardEl.id = sensorId;
-                        sensorCardEl.setAttribute('data-action', 'toggle-select');
-                        sensorCardEl.setAttribute('data-name', sensor.name);
-                        sensorCardEl.setAttribute('data-category', category);
-
-                        sensorCardEl.className = `sensor-card bg-white p-4 rounded-lg shadow border-2 border-gray-200 cursor-pointer transition duration-150 ease-in-out hover:shadow-lg ${isSelected ? 'sensor-card-selected' : ''}`;
-                        sensorCardEl.innerHTML = `
-                            <div class="flex justify-between items-start">
-                                <p class="text-sm font-semibold text-gray-500 mb-1">${sensor.name}</p>
-                                <div id="${sensorId}-icon" class="p-1">
-                                    ${chartIconSvg}
+                    if (sensor.type === 'text') {
+                        // --- TEKST BERICHT KAART RENDERING ---
+                        // FIX: Zorg ervoor dat de laatste entry correct wordt opgehaald en gecontroleerd.
+                        const latestEntry = sensor.history.length > 0 ? sensor.history[sensor.history.length - 1] : null;
+                        const latestMessage = latestEntry ? latestEntry.value : 'Geen bericht ontvangen';
+                        const latestTime = latestEntry ? new Date(latestEntry.time).toLocaleTimeString('nl-NL') : 'N/A';
+                        
+                        if (!sensorCardEl) {
+                            // Creëer NIEUWE tekst kaart
+                            sensorCardEl = document.createElement('div');
+                            sensorCardEl.id = sensorId;
+                            // Geen data-action="toggle-select" voor tekst
+                            sensorCardEl.className = `message-card bg-white p-4 rounded-lg shadow border-2 border-gray-200 transition duration-150 ease-in-out`;
+                            sensorCardEl.innerHTML = `
+                                <div class="flex justify-between items-start">
+                                    <!-- (Log) verwijderd -->
+                                    <p class="text-sm font-semibold text-gray-500 mb-1">${sensor.name}</p>
+                                    <span id="${sensorId}-time" class="text-xs text-gray-400">${latestTime}</span>
                                 </div>
-                            </div>
-                            <div class="flex items-baseline justify-between">
-                                <span id="${sensorId}-value" class="text-4xl font-extrabold ${valueColor}">
-                                    ${sensor.value}
-                                </span>
-                                <span id="${sensorId}-unit" class="text-xl font-medium text-gray-600">
-                                    ${unitText}
-                                </span>
-                            </div>
-                            <div class="mt-2 text-xs text-gray-400">
-                                Bereik: ${sensor.minRange} - ${sensor.maxRange} ${unitText}
-                            </div>
-                        `;
-                        gridEl.appendChild(sensorCardEl);
+                                <p id="${sensorId}-message" class="text-lg font-medium text-gray-800 break-words mt-1 h-12 overflow-hidden">
+                                    ${latestMessage}
+                                </p>
+                            `;
+                            gridEl.appendChild(sensorCardEl);
+                        } else {
+                            // Patch bestaande tekst kaart
+                            const messageEl = document.getElementById(`${sensorId}-message`);
+                            const timeEl = document.getElementById(`${sensorId}-time`);
+                            
+                            if (messageEl) messageEl.textContent = latestMessage;
+                            if (timeEl) timeEl.textContent = latestTime;
+                            
+                            // Geen update meer voor de logboek teller
+                        }
                     } else {
-                        // Patch (BIJWERKEN) van de bestaande kaart
-                        const valueEl = document.getElementById(`${sensorId}-value`);
-                        const unitEl = document.getElementById(`${sensorId}-unit`);
-                        const iconEl = document.getElementById(`${sensorId}-icon`);
+                        // --- NUMERIEKE SENSOR KAART RENDERING (Bestaande logica) ---
+                        const isSelected = selectedSensors.some(s => makeSensorKey(s.category, s.name) === makeSensorKey(category, sensor.name));
+                        
+                        const sensorValue = sensor.history.length > 0 ? sensor.history[sensor.history.length - 1].value : 'N/A';
+                        const valueColor = (typeof sensorValue === 'number' && sensor.maxRange && sensorValue > (sensor.maxRange * 0.8)) ? 'text-red-600' : 'text-green-600';
+                        const unitText = sensor.unit ? sensor.unit : '';
 
-                        // Update selectie status van de kaart
-                        sensorCardEl.classList.toggle('sensor-card-selected', isSelected);
+                        // Icoon SVG voor een grafiek (Groen als geselecteerd, anders grijs)
+                        const chartIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart ${isSelected ? 'text-emerald-500' : 'text-gray-400'}"><path d="M3 3v18h18"/><path d="m18 8-5 5-4-4-5 5"/></svg>`;
 
-                        // Update selectie icoon met groene/grijze grafiek
-                        if (iconEl) {
-                            iconEl.innerHTML = chartIconSvg;
-                        }
+                        if (!sensorCardEl || sensorCardEl.classList.contains('message-card')) {
+                            // Creëer NIEUWE numerieke kaart of vervang oude tekstkaart (dit zou niet mogen gebeuren in de praktijk)
+                            if (sensorCardEl) sensorCardEl.remove(); // Verwijder de oude kaart als deze bestaat en verkeerd is
 
-                        if (valueEl) {
-                            valueEl.textContent = sensor.value;
-                            valueEl.className = `text-4xl font-extrabold ${valueColor}`;
-                        }
-                        if (unitEl) {
-                            unitEl.textContent = unitText;
+                            sensorCardEl = document.createElement('div');
+                            sensorCardEl.id = sensorId;
+                            sensorCardEl.setAttribute('data-action', 'toggle-select');
+                            sensorCardEl.setAttribute('data-name', sensor.name);
+                            sensorCardEl.setAttribute('data-category', category);
+
+                            sensorCardEl.className = `sensor-card bg-white p-4 rounded-lg shadow border-2 border-gray-200 cursor-pointer transition duration-150 ease-in-out hover:shadow-lg ${isSelected ? 'sensor-card-selected' : ''}`;
+                            sensorCardEl.innerHTML = `
+                                <div class="flex justify-between items-start">
+                                    <p class="text-sm font-semibold text-gray-500 mb-1">${sensor.name}</p>
+                                    <div id="${sensorId}-icon" class="p-1">
+                                        ${chartIconSvg}
+                                    </div>
+                                </div>
+                                <div class="flex items-baseline justify-between">
+                                    <span id="${sensorId}-value" class="text-4xl font-extrabold ${valueColor}">
+                                        ${sensorValue}
+                                    </span>
+                                    <span id="${sensorId}-unit" class="text-xl font-medium text-gray-600">
+                                        ${unitText}
+                                    </span>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-400">
+                                    Bereik: ${sensor.minRange} - ${sensor.maxRange} ${unitText}
+                                </div>
+                            `;
+                            gridEl.appendChild(sensorCardEl);
+                        } else {
+                            // Patch (BIJWERKEN) van de bestaande numerieke kaart
+                            const valueEl = document.getElementById(`${sensorId}-value`);
+                            const unitEl = document.getElementById(`${sensorId}-unit`);
+                            const iconEl = document.getElementById(`${sensorId}-icon`);
+
+                            // Update selectie status van de kaart
+                            sensorCardEl.classList.toggle('sensor-card-selected', isSelected);
+
+                            // Update selectie icoon met groene/grijze grafiek
+                            if (iconEl) {
+                                iconEl.innerHTML = chartIconSvg;
+                            }
+
+                            if (valueEl) {
+                                valueEl.textContent = sensorValue;
+                                valueEl.className = `text-4xl font-extrabold ${valueColor}`;
+                            }
+                            if (unitEl) {
+                                unitEl.textContent = unitText;
+                            }
                         }
                     }
                 });
@@ -524,15 +579,21 @@
             try {
                 const newSensor = JSON.parse(jsonLine.trim());
 
-                if (!newSensor.name || !newSensor.category || typeof newSensor.value === 'undefined') {
-                    console.warn('Ontvangen object is geen geldige sensor:', newSensor);
+                // Controleer op minimale vereisten voor OF numerieke data OF een bericht
+                const isMessage = typeof newSensor.message !== 'undefined';
+                
+                if (!newSensor.name || !newSensor.category || (typeof newSensor.value === 'undefined' && !isMessage)) {
+                    // Stille waarschuwing voor onvolledige data
                     return;
                 }
 
+                const dataType = isMessage ? 'text' : 'numeric';
                 const category = newSensor.category;
                 const name = newSensor.name;
                 const timestamp = Date.now();
-                const newValue = newSensor.value;
+                
+                // Belangrijk: haal de waarde of het bericht op
+                const newValueOrMessage = isMessage ? newSensor.message : newSensor.value;
                 const key = makeSensorKey(category, name);
 
                 if (!sensorData[category]) {
@@ -544,32 +605,52 @@
                 if (!existingSensor) {
                     existingSensor = {
                         ...newSensor,
+                        type: dataType, // <-- Belangrijke Type indicator
                         history: [],
-                        minObserved: newValue,
-                        maxObserved: newValue,
                     };
+                    if (dataType === 'numeric') {
+                        // Zorg ervoor dat deze velden bestaan, zelfs als ze ontbreken in de eerste payload
+                        existingSensor.minRange = existingSensor.minRange || 0;
+                        existingSensor.maxRange = existingSensor.maxRange || 100;
+                        existingSensor.unit = existingSensor.unit || '';
+                        
+                        existingSensor.minObserved = newValueOrMessage;
+                        existingSensor.maxObserved = newValueOrMessage;
+                    }
                     sensorData[category].push(existingSensor);
-                    showMessage(`Nieuwe sensor toegevoegd: ${name} (${category})`, false);
+                    showMessage(`Nieuw ${dataType === 'text' ? 'bericht' : 'sensor'} toegevoegd: ${name} (${category})`, false);
                 } else {
+                    // Type mismatch voorkomen
+                    if (existingSensor.type !== dataType) {
+                        console.error(`Type mismatch for sensor ${name}. Expected ${existingSensor.type}, got ${dataType}. Skipping update.`);
+                        return;
+                    }
+                    // Update bestaande metadata. We gebruiken Object.assign om eenheden, min/max ranges bij te werken
+                    // als de zender ze meestuurt (wat goed is).
                     Object.assign(existingSensor, newSensor);
                 }
                 
-                existingSensor.history.push({ time: timestamp, value: newValue });
+                // Geschiedenis update voor beide typen
+                existingSensor.history.push({ time: timestamp, value: newValueOrMessage });
 
                 if (existingSensor.history.length > 1000) {
                     existingSensor.history.shift();
                 }
 
-                if (newValue < existingSensor.minObserved) {
-                    existingSensor.minObserved = newValue;
-                }
-                if (newValue > existingSensor.maxObserved) {
-                    existingSensor.maxObserved = newValue;
-                }
-                
-                if (activeChart && selectedSensors.some(s => makeSensorKey(s.category, s.name) === key)) {
-                    const activeDuration = document.querySelector('#timescaleButtons button.bg-indigo-600')?.getAttribute('data-duration') || '60000';
-                    updateChart(activeDuration);
+                // Alleen numerieke updates
+                if (dataType === 'numeric') {
+                    if (newValueOrMessage < existingSensor.minObserved) {
+                        existingSensor.minObserved = newValueOrMessage;
+                    }
+                    if (newValueOrMessage > existingSensor.maxObserved) {
+                        existingSensor.maxObserved = newValueOrMessage;
+                    }
+                    
+                    // Grafiek update logica
+                    if (activeChart && selectedSensors.some(s => makeSensorKey(s.category, s.name) === key)) {
+                        const activeDuration = document.querySelector('#timescaleButtons button.bg-indigo-600')?.getAttribute('data-duration') || '60000';
+                        updateChart(activeDuration);
+                    }
                 }
 
                 needsRender = true;
@@ -584,7 +665,7 @@
          * Leest data van de seriële poort.
          */
         async function readSerialPort() {
-            isConnected = true; // ZET STATUS OP VERBONDEN
+            isConnected = true; 
             toggleDataStale();  // ZET VERVAGING UIT
 
             updateStatus('Verbonden en leest data...', 'connected');
@@ -624,7 +705,7 @@
                 updateStatus('Klaar om te verbinden.', 'default');
                 // BAUD RATE TONEN
                 baudRateWrapperEl.classList.remove('hidden'); 
-                showMessage('Verbinding verbroken. Data is nu statisch.', false);
+                showMessage('Verbinding verbroken. Data is nu statisch en vervaagd.', false);
                 
                 isConnected = false; // ZET STATUS OP VERBROKEN
                 toggleDataStale();  // ZET VERVAGING AAN
@@ -808,7 +889,8 @@
             // 1. Maak datasets voor elke geselecteerde sensor
             selectedSensors.forEach((sRef, index) => {
                 const sensor = getSensorByKey(makeSensorKey(sRef.category, sRef.name));
-                if (!sensor) return;
+                // Controleer nogmaals of het een numerieke sensor is (zou moeten zijn, maar voor de zekerheid)
+                if (!sensor || sensor.type !== 'numeric') return; 
 
                 const filteredData = sensor.history.filter(point => point.time >= timeLimit);
                 const dataValues = filteredData.map(point => point.value);
