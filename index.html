@@ -6,6 +6,10 @@
     <title>Battery Included Configurator + Session Manager</title>
     <!-- Laad Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <!-- Laad Hammer.js (vereist voor zoom plugin) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <!-- Laad Chart.js Zoom Plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
     <!-- Laad Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tailwind Config voor Dark Mode 'class' strategie -->
@@ -273,22 +277,26 @@
             </div>
 
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <div id="timescaleButtons" class="flex space-x-2">
+                <div id="timescaleButtons" class="flex space-x-2 flex-wrap gap-y-2">
                     <button onclick="updateChart('60000')" data-duration="60000" class="px-3 py-1 rounded text-sm font-medium bg-indigo-600 text-white transition">1 Min</button>
                     <button onclick="updateChart('300000')" data-duration="300000" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">5 Min</button>
                     <button onclick="updateChart('900000')" data-duration="900000" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">15 Min</button>
-                    <!-- Nieuwe "Alles" knop voor loaded sessions -->
                     <button onclick="updateChart('all')" data-duration="all" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">Alles</button>
                 </div>
-                <button onclick="downloadRawSelectedData()" class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 font-medium text-sm flex items-center">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    CSV Export
-                </button>
+                
+                <div class="flex items-center gap-2">
+                     <span id="zoomStatus" class="text-xs text-amber-500 font-semibold hidden">ZOOM ACTIEF</span>
+                     <button onclick="downloadRawSelectedData()" class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 font-medium text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        CSV Export
+                    </button>
+                </div>
             </div>
 
             <div class="relative h-96 w-full">
                 <canvas id="sensorChart"></canvas>
             </div>
+            <p class="text-xs text-gray-400 mt-2 text-center">Scroll/Zoom in de grafiek met muiswiel of touch. Klik op een tijdsperiode om te resetten.</p>
             
             <div id="chartLegend" class="mt-6 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400"></div>
         </div>
@@ -364,12 +372,16 @@
         let settingsDefinition = {}; 
         let settingsChanged = new Set();
         let isConnected = false;
-        let isOfflineMode = false; // NIEUW: Offline status
+        let isOfflineMode = false;
         let activeTab = 'monitor';
         
         let activeChart = null;
         let needsRender = false;
         let renderTimeout = null;
+        
+        // NIEUW: Voor chart fix
+        let lastPacketTime = Date.now(); 
+        let isAutoScrolling = true;
 
         const els = {
             status: document.getElementById('statusMessage'),
@@ -380,14 +392,15 @@
             settingsContainer: document.getElementById('settingsContainer'),
             settingsMsg: document.getElementById('initialSettingsMessage'),
             sendSettingsBtn: document.getElementById('sendSettingsButton'),
-            reqSettingsBtn: document.getElementById('reqSettingsBtn'), // Nieuw
+            reqSettingsBtn: document.getElementById('reqSettingsBtn'),
             openChartBtn: document.getElementById('openChartButton'),
             clearGraphBtn: document.getElementById('clearGraphButton'),
             toast: document.getElementById('toastNotification'),
             toastText: document.getElementById('toastText'),
             toastIcon: document.getElementById('toastIcon'),
             fileInput: document.getElementById('fileInput'),
-            offlineBanner: document.getElementById('offlineBanner')
+            offlineBanner: document.getElementById('offlineBanner'),
+            zoomStatus: document.getElementById('zoomStatus')
         };
 
         // --- 3. TAB LOGICA ---
@@ -411,7 +424,6 @@
 
         // --- 4. VERBINDING LOGICA ---
         async function connectSerialPort() {
-            // Als we offline modus zijn, sluit die eerst
             if (isOfflineMode) closeOfflineSession();
 
             if (port) {
@@ -441,6 +453,9 @@
                 toggleDataStale(false);
                 isConnected = true;
                 els.connectBtn.disabled = false;
+                
+                // Reset time tracker
+                lastPacketTime = Date.now();
 
                 readSerialLoop();
                 requestSettings();
@@ -539,7 +554,10 @@
 
         // --- 5. SENSOR VERWERKING ---
         function processSensorData(data) {
-            if (isOfflineMode) return; // Geen live data in offline modus
+            if (isOfflineMode) return; 
+
+            // Update timestamp van laatste data pakket
+            lastPacketTime = Date.now();
 
             const isMsg = data.message !== undefined;
             if (!sensorData[data.category]) sensorData[data.category] = [];
@@ -555,7 +573,7 @@
             }
 
             const val = isMsg ? data.message : data.value;
-            sensor.history.push({ time: Date.now(), value: val });
+            sensor.history.push({ time: lastPacketTime, value: val });
             
             if (sensor.history.length > 10000) sensor.history.shift();
             Object.assign(sensor, data); 
@@ -605,7 +623,6 @@
                 
                 sensorData[cat].forEach(sensor => {
                     const id = `s-${catId}-${sensor.name.replace(/\s/g, '_')}`;
-                    // Haal laatste punt op (live of geladen data)
                     const lastPt = sensor.history[sensor.history.length - 1];
                     const val = lastPt ? lastPt.value : '-';
                     const time = lastPt ? lastPt.time : Date.now();
@@ -667,9 +684,8 @@
             }
         }
 
-        // --- 6. EXPORT / IMPORT FUNCTIES (NIEUW) ---
+        // --- 6. EXPORT / IMPORT FUNCTIES ---
 
-        // Exporteer huidige state naar JSON bestand
         function exportSession() {
             if (Object.keys(sensorData).length === 0) {
                 showToast("Geen data om op te slaan.", "error");
@@ -701,13 +717,11 @@
             showToast("Sessie succesvol opgeslagen.", "success");
         }
 
-        // Trigger file input click
         function triggerImport() {
-            els.fileInput.value = ''; // Reset zodat 'change' altijd triggert
+            els.fileInput.value = ''; 
             els.fileInput.click();
         }
 
-        // Lees bestand in
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -725,45 +739,34 @@
             reader.readAsText(file);
         }
 
-        // Verwerk geladen data
         async function loadSession(data) {
             if (!data || !data.sensorData) {
                 showToast("Ongeldig bestandsformaat.", "error");
                 return;
             }
 
-            // 1. Verbreek actieve verbinding als die er is
             if (port) {
                 if (reader) await reader.cancel(); 
-                // cleanUpConnection wordt aangeroepen door loop break, maar we forceren state
             }
 
-            // 2. Zet modus
             isOfflineMode = true;
             document.body.classList.add('offline-mode-active');
-            toggleDataStale(false); // Zorg dat data er 'vers' uitziet
+            toggleDataStale(false);
             els.status.textContent = "Offline weergave";
 
-            // 3. Laad data
             sensorData = data.sensorData;
             settingsDefinition = data.settingsDefinition || {};
             
-            // 4. Reset en Render UI
-            selectedSensors = []; // Clear selecties
+            selectedSensors = [];
             updateGraphButtons();
             
-            // Clear oude DOM elementen zodat alles fris opgebouwd wordt
             els.sensorContainer.innerHTML = '';
             els.settingsContainer.innerHTML = ''; 
             
-            // Render sensor grid
             needsRender = true;
             renderSensors();
-            
-            // Render settings (read-only in feite, maar we tonen ze wel)
             renderSettingsControls();
             
-            // Disable 'Update' en 'Request' knoppen voor settings
             els.sendSettingsBtn.disabled = true;
             els.reqSettingsBtn.disabled = true;
             if(Object.keys(settingsDefinition).length === 0) {
@@ -778,7 +781,6 @@
             isOfflineMode = false;
             document.body.classList.remove('offline-mode-active');
             
-            // Reset data
             sensorData = {};
             settingsDefinition = {};
             selectedSensors = [];
@@ -819,7 +821,6 @@
                     card.className = "bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors";
                     
                     let inputHtml = '';
-                    // Disable inputs als we offline zijn
                     const disabledAttr = isOfflineMode ? 'disabled' : '';
                     const opacityClass = isOfflineMode ? 'opacity-60 cursor-not-allowed' : '';
 
@@ -851,7 +852,7 @@
         }
 
         function handleSettingChange(id, value) {
-            if (isOfflineMode) return; // Veiligheid
+            if (isOfflineMode) return;
             const def = settingsDefinition[id];
             let val = value;
             if (def.type === 'value') val = parseFloat(value);
@@ -899,7 +900,6 @@
             } else {
                 selectedSensors.push({ id, category, name });
             }
-            // Force re-render om selectie border te tonen
             renderSensors(); 
             updateGraphButtons();
         }
@@ -931,7 +931,11 @@
             if (selectedSensors.length === 0) return;
             document.getElementById('graphModal').classList.remove('hidden');
             if (!activeChart) initChart();
-            // Als offline modus, toon standaard "Alles"
+            
+            // Reset state bij openen
+            isAutoScrolling = true;
+            updateTimeButtonsUI();
+
             updateChart(isOfflineMode ? 'all' : '60000');
         }
         
@@ -986,7 +990,29 @@
                     maintainAspectRatio: false,
                     animation: false,
                     interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        legend: { display: false },
+                        // ZOOM Config
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                                onPan: () => {
+                                    isAutoScrolling = false;
+                                    updateTimeButtonsUI();
+                                }
+                            },
+                            zoom: {
+                                wheel: { enabled: true },
+                                pinch: { enabled: true },
+                                mode: 'x',
+                                onZoom: () => {
+                                    isAutoScrolling = false;
+                                    updateTimeButtonsUI();
+                                }
+                            }
+                        }
+                    },
                     scales: {
                         x: { 
                             type: 'linear', 
@@ -1006,44 +1032,67 @@
         }
 
         function updateChart(duration) {
+            isAutoScrolling = true; // Knoppen resetten zoom modus
+            
             if (duration !== 'all') {
                 currentDuration = parseInt(duration);
             } else {
                 currentDuration = 'all';
             }
             updateChartFromHistory();
-            
+            updateTimeButtonsUI();
+        }
+
+        function updateTimeButtonsUI() {
+            // Update buttons
             document.querySelectorAll('#timescaleButtons button').forEach(btn => {
-                btn.classList.remove('bg-indigo-600', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                const isActive = isAutoScrolling && 
+                                 ((currentDuration === 'all' && btn.dataset.duration === 'all') || 
+                                  (parseInt(btn.dataset.duration) === currentDuration));
+                
+                if (isActive) {
+                    btn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                    btn.classList.add('bg-indigo-600', 'text-white');
+                } else {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                }
             });
-            const activeBtn = document.querySelector(`button[data-duration="${duration}"]`);
-            if(activeBtn) {
-                 activeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
-                 activeBtn.classList.add('bg-indigo-600', 'text-white');
+
+            // Toon Zoom indicator
+            if (!isAutoScrolling) {
+                els.zoomStatus.classList.remove('hidden');
+            } else {
+                els.zoomStatus.classList.add('hidden');
             }
         }
 
         function updateChartFromHistory() {
             if (!activeChart) return;
-            const now = Date.now();
-            // Als duration 'all' is (voor offline mode), pakken we alles. 
-            // Anders pakken we nu - duration. Voor offline data pakken we de tijd van laatste datapunt als 'nu' referentie als we willen zoomen, 
-            // maar voor simpelheid pakt 'all' gewoon alles in de array.
-            
-            // Bepaal max time in dataset voor offline reference
-            let maxTime = now;
-            if (isOfflineMode && Object.keys(sensorData).length > 0) {
-                 // Vind het allerlaatste datapunt in alle sensoren
-                 let allPoints = [];
-                 selectedSensors.forEach(sel => {
+
+            // Bepaal de 'huidige' tijd voor de grafiek (het rechter eindpunt)
+            let endTime;
+            if (isOfflineMode) {
+                // Offline: zoek max tijd in dataset
+                let maxT = 0;
+                selectedSensors.forEach(sel => {
                     const sData = sensorData[sel.category]?.find(s => s.name === sel.name);
-                    if(sData && sData.history.length) allPoints.push(sData.history[sData.history.length-1].time);
-                 });
-                 if(allPoints.length) maxTime = Math.max(...allPoints);
+                    if(sData && sData.history.length) {
+                        const t = sData.history[sData.history.length-1].time;
+                        if(t > maxT) maxT = t;
+                    }
+                });
+                endTime = maxT || Date.now();
+            } else if (isConnected) {
+                // Verbonden: Huidige tijd
+                endTime = Date.now();
+            } else {
+                // Verbroken (niet offline modus): Laatste datapakket tijd
+                // Dit zorgt ervoor dat de grafiek stopt met 'lopen'
+                endTime = lastPacketTime || Date.now();
             }
 
-            const limit = currentDuration === 'all' ? 0 : (isOfflineMode ? maxTime - currentDuration : now - currentDuration);
+            const limit = currentDuration === 'all' ? 0 : (endTime - currentDuration);
             
             const datasets = [];
             const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -1052,26 +1101,32 @@
                 const sData = sensorData[sel.category]?.find(s => s.name === sel.name);
                 if (!sData) return;
 
-                const pts = sData.history.filter(p => p.time > limit);
+                // Als we auto-scrollen, filteren we data voor prestaties (optioneel, maar goed voor DOM)
+                // Als we zoomen, geven we liever alles (chartjs handelt view af), of we filteren ruim
+                const pts = sData.history; 
+                
                 datasets.push({
                     label: sel.name,
                     data: pts.map(p => ({ x: p.time, y: p.value })),
                     borderColor: colors[i % colors.length],
                     borderWidth: 2,
-                    pointRadius: pts.length > 50 ? 0 : 2, // Toon puntjes bij weinig data
+                    pointRadius: pts.length > 50 ? 0 : 2, 
                     tension: 0.2
                 });
             });
 
             activeChart.data.datasets = datasets;
             
-            // Scales update
-            if (currentDuration === 'all') {
-                delete activeChart.options.scales.x.min;
-                delete activeChart.options.scales.x.max;
-            } else {
-                activeChart.options.scales.x.min = limit;
-                activeChart.options.scales.x.max = isOfflineMode ? maxTime : now;
+            // ALLEEN schalen aanpassen als we in auto-scroll modus zitten.
+            // Als de gebruiker zoomt, laten we Chart.js de schalen beheren.
+            if (isAutoScrolling) {
+                if (currentDuration === 'all') {
+                    delete activeChart.options.scales.x.min;
+                    delete activeChart.options.scales.x.max;
+                } else {
+                    activeChart.options.scales.x.min = limit;
+                    activeChart.options.scales.x.max = endTime;
+                }
             }
             
             activeChart.update();
