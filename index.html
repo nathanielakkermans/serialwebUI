@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Battery Included Configurator</title>
+    <title>Battery Included Configurator + Session Manager</title>
     <!-- Laad Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <!-- Laad Tailwind CSS -->
@@ -98,6 +98,15 @@
         .dark .setting-changed {
             background-color: #451a03; /* Amber 950 (approx) */
         }
+
+        /* Offline Mode Indicator */
+        .offline-mode-active #baudRateWrapper, 
+        .offline-mode-active #connectButton {
+            display: none !important;
+        }
+        .offline-mode-active #offlineBanner {
+            display: flex !important;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen p-4 sm:p-6 transition-colors duration-200">
@@ -110,35 +119,52 @@
         </div>
     </div>
 
+    <!-- HIDDEN FILE INPUT VOOR IMPORT -->
+    <input type="file" id="fileInput" accept=".json" class="hidden" onchange="handleFileSelect(event)" />
+
     <!-- HOOFD CONTAINER -->
     <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6 sm:p-8 transition-colors duration-200">
         
         <!-- HEADER -->
         <header class="mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 
                 <!-- Titel -->
                 <div>
                     <h1 class="text-3xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400">
-                        Battery Included configurator
+                        Battery Included
                     </h1>
                     <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-                        Real-time monitoring & configuratie
+                        Configurator & Data Logger
                     </p>
                 </div>
                 
                 <!-- Controls Rechtsboven -->
-                <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                     
                     <!-- Dark Mode Toggle -->
                     <button id="themeToggle" onclick="toggleTheme()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Wissel Dark Mode">
-                        <!-- Sun Icon -->
                         <svg id="iconSun" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                        <!-- Moon Icon -->
                         <svg id="iconMoon" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 24.042l-1.004.996L17.5 23h-2.146L13.5 21.146v-2.292L11.646 17l1.854-1.854v-2.292l1.854-1.854H17.5L19.354 9.146l1-1 .854 1.854H23.5l1.854 1.854 1.854 1.854v2.292l-1.854 1.854v2.292l-1.854 1.854h-2.146l-1.854 1.854zM21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
                     </button>
 
-                    <!-- Baud Rate -->
+                    <!-- SEPARATOR -->
+                    <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+
+                    <!-- OPSLAAN & LADEN KNOPPEN -->
+                    <button onclick="exportSession()" class="flex items-center px-3 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg text-sm font-medium transition" title="Huidige sessie opslaan">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        Opslaan
+                    </button>
+                    <button onclick="triggerImport()" class="flex items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg text-sm font-medium transition" title="Sessie bestand inladen">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Laden
+                    </button>
+
+                    <!-- SEPARATOR -->
+                    <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+
+                    <!-- SERIAL CONTROLS -->
                     <div id="baudRateWrapper" class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
                         <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-2">BAUD</span>
                         <select id="baudRateSelect" class="bg-transparent border-none text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer">
@@ -150,11 +176,17 @@
                         </select>
                     </div>
                     
-                    <!-- Connect Button -->
                     <button id="connectButton" onclick="connectSerialPort()" class="flex-grow lg:flex-grow-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
                         Verbinden
                     </button>
                     
+                    <!-- OFFLINE BANNER (Standaard verborgen) -->
+                    <div id="offlineBanner" class="hidden items-center px-3 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                        <span class="text-sm font-semibold">Offline Sessie</span>
+                        <button onclick="closeOfflineSession()" class="ml-3 text-xs underline hover:text-amber-900 dark:hover:text-amber-100">Sluiten</button>
+                    </div>
+
                     <!-- Status Text -->
                     <span id="statusMessage" class="hidden lg:inline-block text-sm font-medium text-gray-500 dark:text-gray-400">
                         Niet verbonden
@@ -192,7 +224,7 @@
                 <div id="initialMessage" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
                     <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     <p class="text-gray-500 dark:text-gray-400 font-medium">Wacht op data...</p>
-                    <p class="text-sm text-gray-400">Verbind met het apparaat om te starten.</p>
+                    <p class="text-sm text-gray-400">Verbind met het apparaat of laad een sessie.</p>
                 </div>
             </div>
         </main>
@@ -208,7 +240,7 @@
                 </div>
                 
                 <div class="flex space-x-3 w-full sm:w-auto">
-                    <button onclick="requestSettings()" class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-white font-medium text-sm rounded-lg transition">
+                    <button id="reqSettingsBtn" onclick="requestSettings()" class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-white font-medium text-sm rounded-lg transition">
                         Lees Instellingen
                     </button>
 
@@ -240,11 +272,13 @@
                 </button>
             </div>
 
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                 <div id="timescaleButtons" class="flex space-x-2">
                     <button onclick="updateChart('60000')" data-duration="60000" class="px-3 py-1 rounded text-sm font-medium bg-indigo-600 text-white transition">1 Min</button>
                     <button onclick="updateChart('300000')" data-duration="300000" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">5 Min</button>
                     <button onclick="updateChart('900000')" data-duration="900000" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">15 Min</button>
+                    <!-- Nieuwe "Alles" knop voor loaded sessions -->
+                    <button onclick="updateChart('all')" data-duration="all" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">Alles</button>
                 </div>
                 <button onclick="downloadRawSelectedData()" class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 font-medium text-sm flex items-center">
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -260,7 +294,7 @@
         </div>
     </div>
 
-    <!-- LOGBOEK MODAL (NIEUW) -->
+    <!-- LOGBOEK MODAL -->
     <div id="logModal" class="modal-overlay hidden" onclick="if(event.target === this) closeLogModal()">
         <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
             <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
@@ -279,7 +313,6 @@
     <script>
         // --- 1. THEMA / DARK MODE LOGICA ---
         function initTheme() {
-            // Check systeemvoorkeur of eerder opgeslagen keuze
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.classList.add('dark');
                 updateThemeIcons(true);
@@ -299,7 +332,6 @@
                 localStorage.theme = 'dark';
                 updateThemeIcons(true);
             }
-            // Forceer grafiek update voor kleurverandering
             if (activeChart) {
                 activeChart.options.scales.x.grid.color = getChartGridColor();
                 activeChart.options.scales.y.grid.color = getChartGridColor();
@@ -323,7 +355,6 @@
             return document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
         }
 
-        // Initialiseer thema direct
         initTheme();
 
         // --- 2. GLOBALE VARIABELEN ---
@@ -333,13 +364,13 @@
         let settingsDefinition = {}; 
         let settingsChanged = new Set();
         let isConnected = false;
+        let isOfflineMode = false; // NIEUW: Offline status
         let activeTab = 'monitor';
         
         let activeChart = null;
         let needsRender = false;
         let renderTimeout = null;
 
-        // --- DOM Elementen ---
         const els = {
             status: document.getElementById('statusMessage'),
             connectBtn: document.getElementById('connectButton'),
@@ -349,17 +380,19 @@
             settingsContainer: document.getElementById('settingsContainer'),
             settingsMsg: document.getElementById('initialSettingsMessage'),
             sendSettingsBtn: document.getElementById('sendSettingsButton'),
+            reqSettingsBtn: document.getElementById('reqSettingsBtn'), // Nieuw
             openChartBtn: document.getElementById('openChartButton'),
             clearGraphBtn: document.getElementById('clearGraphButton'),
             toast: document.getElementById('toastNotification'),
             toastText: document.getElementById('toastText'),
-            toastIcon: document.getElementById('toastIcon')
+            toastIcon: document.getElementById('toastIcon'),
+            fileInput: document.getElementById('fileInput'),
+            offlineBanner: document.getElementById('offlineBanner')
         };
 
         // --- 3. TAB LOGICA ---
         window.setActiveTab = function(tab) {
             activeTab = tab;
-            
             document.getElementById('monitorView').classList.toggle('hidden', tab !== 'monitor');
             document.getElementById('settingsView').classList.toggle('hidden', tab !== 'settings');
             
@@ -372,13 +405,15 @@
             } else {
                 btnMonitor.classList.remove('tab-active');
                 btnSettings.classList.add('tab-active');
-                // Alleen renderen bij tabwissel als er data is, niet continu
                 renderSettingsControls(); 
             }
         };
 
         // --- 4. VERBINDING LOGICA ---
         async function connectSerialPort() {
+            // Als we offline modus zijn, sluit die eerst
+            if (isOfflineMode) closeOfflineSession();
+
             if (port) {
                 if (reader) await reader.cancel();
                 return;
@@ -407,10 +442,7 @@
                 isConnected = true;
                 els.connectBtn.disabled = false;
 
-                // Start leeslus
                 readSerialLoop();
-
-                // STAP 5: Vraag direct settings op
                 requestSettings();
 
             } catch (err) {
@@ -422,6 +454,10 @@
         }
 
         async function requestSettings() {
+            if (isOfflineMode) {
+                showToast("Instellingen kunnen niet worden opgevraagd in offline modus.", "info");
+                return;
+            }
             await sendSerialData({ command: "REQUEST_SETTINGS" });
             showToast("Instellingen opgevraagd...", "info");
         }
@@ -467,13 +503,14 @@
             
             port = null; reader = null; writer = null; isConnected = false;
             
-            els.status.textContent = "Niet verbonden";
-            els.connectBtn.textContent = "Verbinden";
-            els.connectBtn.classList.replace('bg-red-600', 'bg-indigo-600');
-            els.connectBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
-            els.baudWrapper.classList.remove('hidden');
-            
-            toggleDataStale(true);
+            if (!isOfflineMode) {
+                els.status.textContent = "Niet verbonden";
+                els.connectBtn.textContent = "Verbinden";
+                els.connectBtn.classList.replace('bg-red-600', 'bg-indigo-600');
+                els.connectBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+                els.baudWrapper.classList.remove('hidden');
+                toggleDataStale(true);
+            }
         }
 
         class LineBreakTransformer {
@@ -490,27 +527,21 @@
         function handleSerialLine(line) {
             try {
                 const data = JSON.parse(line.trim());
-                
-                // 1. Settings Definitie
                 if (data.command === "SETTINGS_DEFINITION" && data.settings) {
                     processSettingsDefinition(data.settings);
                     return;
                 }
-
-                // 2. Sensor Data
                 if (data.name && data.category && (data.value !== undefined || data.message !== undefined)) {
                     processSensorData(data);
                 }
-            } catch (e) {
-                // Negeer niet-JSON regels
-            }
+            } catch (e) { }
         }
 
         // --- 5. SENSOR VERWERKING ---
         function processSensorData(data) {
-            const key = data.category + '|' + data.name;
+            if (isOfflineMode) return; // Geen live data in offline modus
+
             const isMsg = data.message !== undefined;
-            
             if (!sensorData[data.category]) sensorData[data.category] = [];
             
             let sensor = sensorData[data.category].find(s => s.name === data.name);
@@ -523,19 +554,12 @@
                 sensorData[data.category].push(sensor);
             }
 
-            // Update waarden
             const val = isMsg ? data.message : data.value;
             sensor.history.push({ time: Date.now(), value: val });
             
-            // FIX: Buffer verhoogd van 500 naar 10000. 
-            // 500 punten @ 10Hz = 50 seconden. 
-            // 10000 punten @ 10Hz = 1000 seconden (~16 min).
             if (sensor.history.length > 10000) sensor.history.shift();
-            
-            // Metadata update (min/max/unit kan veranderen)
             Object.assign(sensor, data); 
 
-            // Trigger UI update (throttled)
             needsRender = true;
             throttleUI();
         }
@@ -545,16 +569,22 @@
             renderTimeout = setTimeout(() => {
                 if (needsRender) {
                     renderSensors();
-                    // Update grafiek als open
                     if (activeChart) updateChartFromHistory();
                     needsRender = false;
                 }
                 renderTimeout = null;
-            }, 100); // 10 FPS max
+            }, 100);
         }
 
         function renderSensors() {
-            els.initialMsg.classList.add('hidden');
+            if (Object.keys(sensorData).length > 0) {
+                els.initialMsg.classList.add('hidden');
+            } else {
+                els.initialMsg.classList.remove('hidden');
+                els.sensorContainer.innerHTML = '';
+                els.sensorContainer.appendChild(els.initialMsg);
+                return;
+            }
             
             for (const cat in sensorData) {
                 const catId = cat.replace(/\s/g, '_');
@@ -575,8 +605,11 @@
                 
                 sensorData[cat].forEach(sensor => {
                     const id = `s-${catId}-${sensor.name.replace(/\s/g, '_')}`;
+                    // Haal laatste punt op (live of geladen data)
                     const lastPt = sensor.history[sensor.history.length - 1];
                     const val = lastPt ? lastPt.value : '-';
+                    const time = lastPt ? lastPt.time : Date.now();
+                    
                     const isNum = sensor.type === 'numeric';
                     const isSelected = selectedSensors.some(s => s.id === id);
 
@@ -585,12 +618,10 @@
                     if (!card) {
                         card = document.createElement('div');
                         card.id = id;
-                        // Click handler voor selectie
                         if (isNum) {
                             card.onclick = () => toggleSelection(id, cat, sensor.name);
                             card.className = "sensor-card relative bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:shadow-md transition duration-200";
                         } else {
-                            // NIEUW: Logboek klik handler voor tekst kaarten
                             card.onclick = () => openLogModal(cat, sensor.name);
                             card.className = "message-card bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 shadow-sm cursor-pointer hover:shadow-md transition duration-200";
                         }
@@ -616,66 +647,190 @@
                         grid.appendChild(card);
                     }
 
-                    // Update Content
                     if (isNum) {
                         const valEl = document.getElementById(`val-${id}`);
                         if (valEl.textContent != val) valEl.textContent = typeof val === 'number' ? val.toFixed(2).replace(/[.,]00$/, "") : val;
                         
-                        // FIX: Robuuste dark mode kleurenselectie
                         const iconEl = document.getElementById(`icon-${id}`);
                         if (isSelected) {
                             card.classList.add('sensor-card-selected');
-                            // Helder indigo in beide modi, maar aangepast voor contrast
                             iconEl.className = "text-indigo-500 dark:text-indigo-400";
                         } else {
                             card.classList.remove('sensor-card-selected');
-                            // Grijs in beide modi
                             iconEl.className = "text-gray-300 dark:text-gray-600";
                         }
                     } else {
                         document.getElementById(`msg-${id}`).textContent = val;
-                        document.getElementById(`time-${id}`).textContent = new Date(lastPt.time).toLocaleTimeString();
+                        document.getElementById(`time-${id}`).textContent = new Date(time).toLocaleTimeString();
                     }
                 });
             }
         }
 
-        // --- 6. INSTELLINGEN LOGICA (GEFIXT) ---
-        
+        // --- 6. EXPORT / IMPORT FUNCTIES (NIEUW) ---
+
+        // Exporteer huidige state naar JSON bestand
+        function exportSession() {
+            if (Object.keys(sensorData).length === 0) {
+                showToast("Geen data om op te slaan.", "error");
+                return;
+            }
+
+            const sessionDump = {
+                meta: {
+                    exportedAt: Date.now(),
+                    appVersion: "1.0",
+                    totalSensors: Object.values(sensorData).reduce((acc, val) => acc + val.length, 0)
+                },
+                sensorData: sensorData,
+                settingsDefinition: settingsDefinition
+            };
+
+            const jsonStr = JSON.stringify(sessionDump, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sessie_dump_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast("Sessie succesvol opgeslagen.", "success");
+        }
+
+        // Trigger file input click
+        function triggerImport() {
+            els.fileInput.value = ''; // Reset zodat 'change' altijd triggert
+            els.fileInput.click();
+        }
+
+        // Lees bestand in
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    loadSession(JSON.parse(content));
+                } catch (err) {
+                    console.error(err);
+                    showToast("Fout bij lezen bestand: " + err.message, "error");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Verwerk geladen data
+        async function loadSession(data) {
+            if (!data || !data.sensorData) {
+                showToast("Ongeldig bestandsformaat.", "error");
+                return;
+            }
+
+            // 1. Verbreek actieve verbinding als die er is
+            if (port) {
+                if (reader) await reader.cancel(); 
+                // cleanUpConnection wordt aangeroepen door loop break, maar we forceren state
+            }
+
+            // 2. Zet modus
+            isOfflineMode = true;
+            document.body.classList.add('offline-mode-active');
+            toggleDataStale(false); // Zorg dat data er 'vers' uitziet
+            els.status.textContent = "Offline weergave";
+
+            // 3. Laad data
+            sensorData = data.sensorData;
+            settingsDefinition = data.settingsDefinition || {};
+            
+            // 4. Reset en Render UI
+            selectedSensors = []; // Clear selecties
+            updateGraphButtons();
+            
+            // Clear oude DOM elementen zodat alles fris opgebouwd wordt
+            els.sensorContainer.innerHTML = '';
+            els.settingsContainer.innerHTML = ''; 
+            
+            // Render sensor grid
+            needsRender = true;
+            renderSensors();
+            
+            // Render settings (read-only in feite, maar we tonen ze wel)
+            renderSettingsControls();
+            
+            // Disable 'Update' en 'Request' knoppen voor settings
+            els.sendSettingsBtn.disabled = true;
+            els.reqSettingsBtn.disabled = true;
+            if(Object.keys(settingsDefinition).length === 0) {
+                 els.settingsMsg.innerHTML = '<p class="text-gray-500">Geen instellingen gevonden in dit bestand.</p>';
+                 els.settingsMsg.classList.remove('hidden');
+            }
+
+            showToast("Sessie succesvol ingeladen.", "success");
+        }
+
+        function closeOfflineSession() {
+            isOfflineMode = false;
+            document.body.classList.remove('offline-mode-active');
+            
+            // Reset data
+            sensorData = {};
+            settingsDefinition = {};
+            selectedSensors = [];
+            
+            els.sensorContainer.innerHTML = '';
+            els.settingsContainer.innerHTML = '';
+            els.initialMsg.classList.remove('hidden');
+            els.settingsMsg.classList.remove('hidden');
+            
+            els.reqSettingsBtn.disabled = false;
+            els.status.textContent = "Niet verbonden";
+            
+            toggleDataStale(true);
+            updateGraphButtons();
+        }
+
+
+        // --- 7. SETTINGS LOGICA ---
         function processSettingsDefinition(newSettings) {
-            // Sla definities op
             newSettings.forEach(s => {
                 settingsDefinition[s.id] = { ...s, originalValue: s.value };
             });
-            
-            // Render maar 1 keer per definitie-update, NIET bij elke sensor tick
             renderSettingsControls();
-            showToast("Instellingen geladen", "success");
+            if(!isOfflineMode) showToast("Instellingen geladen", "success");
         }
 
         function renderSettingsControls() {
-            els.settingsMsg.classList.add('hidden');
+            if (Object.keys(settingsDefinition).length > 0) els.settingsMsg.classList.add('hidden');
             const container = els.settingsContainer;
 
             Object.values(settingsDefinition).forEach(setting => {
                 const elId = `input-${setting.id}`;
                 let card = document.getElementById(`card-${setting.id}`);
                 
-                // 1. Creëer kaart als hij niet bestaat (Structuur)
                 if (!card) {
                     card = document.createElement('div');
                     card.id = `card-${setting.id}`;
                     card.className = "bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors";
                     
                     let inputHtml = '';
+                    // Disable inputs als we offline zijn
+                    const disabledAttr = isOfflineMode ? 'disabled' : '';
+                    const opacityClass = isOfflineMode ? 'opacity-60 cursor-not-allowed' : '';
+
                     if (setting.type === 'select') {
                         const opts = setting.options.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
-                        inputHtml = `<select id="${elId}" onchange="handleSettingChange('${setting.id}', this.value)" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">${opts}</select>`;
+                        inputHtml = `<select id="${elId}" ${disabledAttr} onchange="handleSettingChange('${setting.id}', this.value)" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 ${opacityClass}">${opts}</select>`;
                     } else {
                         const type = setting.type === 'value' ? 'number' : 'text';
                         const step = setting.step || 'any';
                         inputHtml = `<div class="relative">
-                            <input type="${type}" id="${elId}" step="${step}" onchange="handleSettingChange('${setting.id}', this.value)" class="block w-full p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            <input type="${type}" id="${elId}" step="${step}" ${disabledAttr} onchange="handleSettingChange('${setting.id}', this.value)" class="block w-full p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white ${opacityClass}">
                             ${setting.unit ? `<div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500 text-sm">${setting.unit}</div>` : ''}
                         </div>`;
                     }
@@ -688,29 +843,21 @@
                     container.appendChild(card);
                 }
 
-                // 2. Update Waarde (Alleen als de gebruiker het niet heeft aangepast)
-                // Dit voorkomt dat de cursor verspringt of dropdown reset terwijl je typt.
                 if (!settingsChanged.has(setting.id)) {
                     const input = document.getElementById(elId);
-                    if (input) {
-                        // Check of waarde echt anders is om onnodige DOM updates te voorkomen
-                        if (input.value != setting.value) {
-                             input.value = setting.value;
-                        }
-                    }
+                    if (input && input.value != setting.value) input.value = setting.value;
                 }
             });
         }
 
         function handleSettingChange(id, value) {
+            if (isOfflineMode) return; // Veiligheid
             const def = settingsDefinition[id];
             let val = value;
             if (def.type === 'value') val = parseFloat(value);
             
-            // Vergelijk met origineel (zoals ontvangen van ESP)
             if (val != def.originalValue) {
                 settingsChanged.add(id);
-                // Update tijdelijke lokale waarde
                 settingsDefinition[id].value = val;
                 document.getElementById(`card-${id}`).classList.add('setting-changed');
             } else {
@@ -731,23 +878,20 @@
         }
 
         async function sendAllChangedSettings() {
-            if (!isConnected) return;
+            if (!isConnected || isOfflineMode) return;
             
             for (const id of settingsChanged) {
                 const setting = settingsDefinition[id];
                 await sendSerialData({ command: "SET", id: id, value: setting.value });
-                
-                // Reset status
                 setting.originalValue = setting.value; 
                 document.getElementById(`card-${id}`).classList.remove('setting-changed');
             }
-            
             settingsChanged.clear();
             updateSendButton();
             showToast("Instellingen bijgewerkt", "success");
         }
 
-        // --- 7. GRAFIEK & SELECTIE LOGICA ---
+        // --- 8. GRAFIEK & SELECTIE LOGICA ---
         function toggleSelection(id, category, name) {
             const idx = selectedSensors.findIndex(s => s.id === id);
             if (idx >= 0) {
@@ -755,7 +899,8 @@
             } else {
                 selectedSensors.push({ id, category, name });
             }
-            renderSensors(); // Update visuals
+            // Force re-render om selectie border te tonen
+            renderSensors(); 
             updateGraphButtons();
         }
 
@@ -786,14 +931,15 @@
             if (selectedSensors.length === 0) return;
             document.getElementById('graphModal').classList.remove('hidden');
             if (!activeChart) initChart();
-            updateChart('60000'); // Default 1 min
+            // Als offline modus, toon standaard "Alles"
+            updateChart(isOfflineMode ? 'all' : '60000');
         }
         
         function closeGraphModal() {
             document.getElementById('graphModal').classList.add('hidden');
         }
 
-        // --- NIEUW: LOGBOEK MODAL LOGICA ---
+        // --- 9. LOGBOEK ---
         function openLogModal(category, name) {
             const sensor = sensorData[category]?.find(s => s.name === name);
             if (!sensor) return;
@@ -802,7 +948,6 @@
             const container = document.getElementById('logContainer');
             container.innerHTML = '';
 
-            // Kopieer history en draai om (nieuwste boven)
             const logs = [...sensor.history].reverse();
 
             if (logs.length === 0) {
@@ -828,7 +973,7 @@
             document.getElementById('logModal').classList.add('hidden');
         }
 
-        // --- CHART.JS CONFIG ---
+        // --- 10. CHART.JS CONFIG ---
         let currentDuration = 60000;
         
         function initChart() {
@@ -861,10 +1006,13 @@
         }
 
         function updateChart(duration) {
-            currentDuration = parseInt(duration);
+            if (duration !== 'all') {
+                currentDuration = parseInt(duration);
+            } else {
+                currentDuration = 'all';
+            }
             updateChartFromHistory();
             
-            // Knoppen styling reset
             document.querySelectorAll('#timescaleButtons button').forEach(btn => {
                 btn.classList.remove('bg-indigo-600', 'text-white');
                 btn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
@@ -879,12 +1027,29 @@
         function updateChartFromHistory() {
             if (!activeChart) return;
             const now = Date.now();
-            const limit = now - currentDuration;
+            // Als duration 'all' is (voor offline mode), pakken we alles. 
+            // Anders pakken we nu - duration. Voor offline data pakken we de tijd van laatste datapunt als 'nu' referentie als we willen zoomen, 
+            // maar voor simpelheid pakt 'all' gewoon alles in de array.
+            
+            // Bepaal max time in dataset voor offline reference
+            let maxTime = now;
+            if (isOfflineMode && Object.keys(sensorData).length > 0) {
+                 // Vind het allerlaatste datapunt in alle sensoren
+                 let allPoints = [];
+                 selectedSensors.forEach(sel => {
+                    const sData = sensorData[sel.category]?.find(s => s.name === sel.name);
+                    if(sData && sData.history.length) allPoints.push(sData.history[sData.history.length-1].time);
+                 });
+                 if(allPoints.length) maxTime = Math.max(...allPoints);
+            }
+
+            const limit = currentDuration === 'all' ? 0 : (isOfflineMode ? maxTime - currentDuration : now - currentDuration);
+            
             const datasets = [];
             const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
             selectedSensors.forEach((sel, i) => {
-                const sData = sensorData[sel.category].find(s => s.name === sel.name);
+                const sData = sensorData[sel.category]?.find(s => s.name === sel.name);
                 if (!sData) return;
 
                 const pts = sData.history.filter(p => p.time > limit);
@@ -893,24 +1058,31 @@
                     data: pts.map(p => ({ x: p.time, y: p.value })),
                     borderColor: colors[i % colors.length],
                     borderWidth: 2,
-                    pointRadius: 0,
+                    pointRadius: pts.length > 50 ? 0 : 2, // Toon puntjes bij weinig data
                     tension: 0.2
                 });
             });
 
             activeChart.data.datasets = datasets;
-            activeChart.options.scales.x.min = limit;
-            activeChart.options.scales.x.max = now;
+            
+            // Scales update
+            if (currentDuration === 'all') {
+                delete activeChart.options.scales.x.min;
+                delete activeChart.options.scales.x.max;
+            } else {
+                activeChart.options.scales.x.min = limit;
+                activeChart.options.scales.x.max = isOfflineMode ? maxTime : now;
+            }
+            
             activeChart.update();
             
-            // Update Legend
             const legend = document.getElementById('chartLegend');
             legend.innerHTML = datasets.map((d, i) => `
                 <div class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color:${d.borderColor}"></span>${d.label}</div>
             `).join('');
         }
         
-        // --- 8. HELPERS ---
+        // --- 11. HELPERS ---
         function showToast(msg, type) {
             els.toastText.textContent = msg;
             els.toast.classList.remove('border-red-500', 'border-emerald-500', 'border-blue-500');
