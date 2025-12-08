@@ -117,7 +117,7 @@
         <header class="mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 
-                <!-- Titel (Aangepast) -->
+                <!-- Titel -->
                 <div>
                     <h1 class="text-3xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400">
                         Battery Included configurator
@@ -138,7 +138,7 @@
                         <svg id="iconMoon" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 24.042l-1.004.996L17.5 23h-2.146L13.5 21.146v-2.292L11.646 17l1.854-1.854v-2.292l1.854-1.854H17.5L19.354 9.146l1-1 .854 1.854H23.5l1.854 1.854 1.854 1.854v2.292l-1.854 1.854v2.292l-1.854 1.854h-2.146l-1.854 1.854zM21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
                     </button>
 
-                    <!-- Baud Rate (Hoogte aangepast naar py-2) -->
+                    <!-- Baud Rate -->
                     <div id="baudRateWrapper" class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
                         <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-2">BAUD</span>
                         <select id="baudRateSelect" class="bg-transparent border-none text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer">
@@ -208,7 +208,6 @@
                 </div>
                 
                 <div class="flex space-x-3 w-full sm:w-auto">
-                    <!-- NIEUWE KNOP: Lees Instellingen Handmatig -->
                     <button onclick="requestSettings()" class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-white font-medium text-sm rounded-lg transition">
                         Lees Instellingen
                     </button>
@@ -258,6 +257,21 @@
             </div>
             
             <div id="chartLegend" class="mt-6 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400"></div>
+        </div>
+    </div>
+
+    <!-- LOGBOEK MODAL (NIEUW) -->
+    <div id="logModal" class="modal-overlay hidden" onclick="if(event.target === this) closeLogModal()">
+        <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+            <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
+                <h2 id="logModalTitle" class="text-xl font-bold">Logboek</h2>
+                <button onclick="closeLogModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="logContainer" class="max-h-96 overflow-y-auto space-y-2">
+                <!-- Logs worden hier dynamisch ingevoegd -->
+            </div>
         </div>
     </div>
 
@@ -576,7 +590,9 @@
                             card.onclick = () => toggleSelection(id, cat, sensor.name);
                             card.className = "sensor-card relative bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:shadow-md transition duration-200";
                         } else {
-                            card.className = "message-card bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 shadow-sm";
+                            // NIEUW: Logboek klik handler voor tekst kaarten
+                            card.onclick = () => openLogModal(cat, sensor.name);
+                            card.className = "message-card bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 shadow-sm cursor-pointer hover:shadow-md transition duration-200";
                         }
                         
                         card.innerHTML = isNum ? `
@@ -775,6 +791,41 @@
         
         function closeGraphModal() {
             document.getElementById('graphModal').classList.add('hidden');
+        }
+
+        // --- NIEUW: LOGBOEK MODAL LOGICA ---
+        function openLogModal(category, name) {
+            const sensor = sensorData[category]?.find(s => s.name === name);
+            if (!sensor) return;
+
+            document.getElementById('logModalTitle').textContent = `Logboek: ${sensor.name}`;
+            const container = document.getElementById('logContainer');
+            container.innerHTML = '';
+
+            // Kopieer history en draai om (nieuwste boven)
+            const logs = [...sensor.history].reverse();
+
+            if (logs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 italic">Geen logboek data beschikbaar.</p>';
+            } else {
+                logs.forEach(log => {
+                    const el = document.createElement('div');
+                    el.className = "flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700";
+                    const timeStr = new Date(log.time).toLocaleTimeString() + (new Date(log.time).toDateString() !== new Date().toDateString() ? ` <span class="text-xs text-gray-400">(${new Date(log.time).toLocaleDateString()})</span>` : '');
+                    
+                    el.innerHTML = `
+                        <div class="text-sm text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap mr-4 mt-0.5">${timeStr}</div>
+                        <div class="text-gray-800 dark:text-gray-200 font-medium break-words flex-1">${log.value}</div>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+
+            document.getElementById('logModal').classList.remove('hidden');
+        }
+
+        function closeLogModal() {
+            document.getElementById('logModal').classList.add('hidden');
         }
 
         // --- CHART.JS CONFIG ---
