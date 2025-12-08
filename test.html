@@ -1,1394 +1,915 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl" class="antialiased">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamische Seriële Sensor en Configuratie</title>
+    <title>Battery Included Configurator</title>
+    <!-- Laad Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <!-- Laad Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Config voor Dark Mode 'class' strategie -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            750: '#2d3748',
+                            850: '#1a202c',
+                            950: '#0d1117',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7fafc;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
-        /* Stijl voor de Modal */
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+        
+        .dark ::-webkit-scrollbar-thumb { background: #4a5568; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #718096; }
+
+        /* Modal styling */
         .modal-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
             z-index: 50;
             display: flex;
             justify-content: center;
             align-items: center;
         }
         .modal-content {
-            max-width: 95%;
-            max-height: 95%;
-            width: 900px; 
-            background: white;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            max-width: 95%; max-height: 95%; width: 900px; 
+            padding: 2rem; border-radius: 0.75rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             overflow: auto; 
         }
 
-        /* Stijl voor geselecteerde kaart */
+        /* Sensor kaart selectie */
         .sensor-card-selected {
-            border-color: #6366f1; /* Tailwind indigo-500 */
-            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3); 
+            border-color: #6366f1 !important; /* Indigo 500 */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
         }
 
-        /* STERKERE VERVAGING BIJ DISCONNECTIE */
+        /* Data stale effect */
         .data-stale .sensor-card, .data-stale .message-card {
-            opacity: 0.3; 
-            filter: blur(1.5px); 
+            opacity: 0.5; 
+            filter: grayscale(80%);
             transition: opacity 0.5s, filter 0.5s;
         }
         
-        /* Stijl voor de zwevende melding (Toast) */
+        /* Toast */
         #toastNotification {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 100;
-            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-            transform: translateY(-10px);
-            opacity: 0;
-            max-width: 300px;
+            position: fixed; top: 1rem; right: 1rem; z-index: 100;
+            transition: all 0.3s ease-in-out;
+            transform: translateY(-20px); opacity: 0;
+            max-width: 350px;
         }
-        #toastNotification.show {
-            transform: translateY(0);
-            opacity: 1;
-        }
+        #toastNotification.show { transform: translateY(0); opacity: 1; }
         
-        /* Stijl voor actieve Tab */
+        /* Tabs */
+        .tab-btn { border-bottom: 2px solid transparent; }
         .tab-active {
-            border-bottom: 3px solid #6366f1; /* indigo-500 */
-            color: #4338ca; /* indigo-700 */
-            font-weight: 600;
+            border-bottom-color: #6366f1; /* Indigo 500 */
+            color: #4f46e5; /* Indigo 600 */
         }
+        .dark .tab-active { color: #818cf8; /* Indigo 400 */ }
 
-        /* Stijl voor instelling met wijziging */
+        /* Settings Changed Highlight */
         .setting-changed {
-            background-color: #fffbeb; /* yellow-50 */
-            border-left: 5px solid #f59e0b; /* amber-500 */
+            border-left: 4px solid #f59e0b !important; /* Amber 500 */
+            background-color: #fffbeb; 
+        }
+        .dark .setting-changed {
+            background-color: #451a03; /* Amber 950 (approx) */
         }
     </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8">
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen p-4 sm:p-6 transition-colors duration-200">
 
-    <div id="toastNotification" class="hidden p-4 rounded-lg shadow-xl" role="alert">
-        <p id="toastText" class="font-medium text-sm"></p>
+    <!-- TOAST NOTIFICATION -->
+    <div id="toastNotification" class="hidden p-4 rounded-lg shadow-xl border-l-4 bg-white dark:bg-gray-800" role="alert">
+        <div class="flex items-center">
+            <div class="flex-shrink-0 mr-3" id="toastIcon"></div>
+            <p id="toastText" class="font-medium text-sm"></p>
+        </div>
     </div>
 
-    <div class="max-w-full xl:max-w-screen-2xl mx-auto bg-white shadow-xl rounded-xl p-6 sm:p-10">
+    <!-- HOOFD CONTAINER -->
+    <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6 sm:p-8 transition-colors duration-200">
         
-        <header class="mb-4 border-b pb-4">
-            
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <!-- HEADER -->
+        <header class="mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                
+                <!-- Titel (Aangepast) -->
                 <div>
-                    <h1 class="text-3xl font-extrabold text-indigo-700">Seriële Apparaat Controller</h1>
-                    <p class="text-gray-500 mt-1">Monitor en configureer uw seriële apparaat via JSON.</p>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400">
+                        Battery Included configurator
+                    </h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+                        Real-time monitoring & configuratie
+                    </p>
                 </div>
                 
-                <div id="connectionControls" class="mt-4 sm:mt-0 flex items-center space-x-4">
+                <!-- Controls Rechtsboven -->
+                <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                     
-                    <div id="baudRateWrapper" class="flex items-center space-x-1">
-                        <label for="baudRateSelect" class="text-xs font-medium text-gray-700 whitespace-nowrap hidden lg:inline">Baud:</label>
-                        <select id="baudRateSelect" class="py-1 px-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm w-24">
+                    <!-- Dark Mode Toggle -->
+                    <button id="themeToggle" onclick="toggleTheme()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Wissel Dark Mode">
+                        <!-- Sun Icon -->
+                        <svg id="iconSun" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        <!-- Moon Icon -->
+                        <svg id="iconMoon" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 24.042l-1.004.996L17.5 23h-2.146L13.5 21.146v-2.292L11.646 17l1.854-1.854v-2.292l1.854-1.854H17.5L19.354 9.146l1-1 .854 1.854H23.5l1.854 1.854 1.854 1.854v2.292l-1.854 1.854v2.292l-1.854 1.854h-2.146l-1.854 1.854zM21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+                    </button>
+
+                    <!-- Baud Rate (Hoogte aangepast naar py-2) -->
+                    <div id="baudRateWrapper" class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
+                        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-2">BAUD</span>
+                        <select id="baudRateSelect" class="bg-transparent border-none text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer">
                             <option value="115200" selected>115200</option>
+                            <option value="9600">9600</option>
                             <option value="250000">250000</option>
                             <option value="500000">500000</option>
                             <option value="1000000">1000000</option>
                         </select>
                     </div>
                     
-                    <button id="connectButton"
-                            class="px-3 py-1 bg-indigo-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 ease-in-out disabled:opacity-50"
-                            onclick="connectSerialPort()">
-                        Verbind
+                    <!-- Connect Button -->
+                    <button id="connectButton" onclick="connectSerialPort()" class="flex-grow lg:flex-grow-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+                        Verbinden
                     </button>
-
-                    <div id="statusMessage" class="font-medium text-sm text-gray-600 whitespace-nowrap">
-                        Klaar om te verbinden.
-                    </div>
+                    
+                    <!-- Status Text -->
+                    <span id="statusMessage" class="hidden lg:inline-block text-sm font-medium text-gray-500 dark:text-gray-400">
+                        Niet verbonden
+                    </span>
                 </div>
             </div>
             
-            <div class="flex mt-4 space-x-6">
-                <button id="tabMonitor" onclick="setActiveTab('monitor')" class="py-2 text-gray-500 hover:text-indigo-700 transition tab-active">
+            <!-- NAVIGATIE TABS -->
+            <div class="flex mt-6 space-x-6">
+                <button id="tabMonitor" onclick="setActiveTab('monitor')" class="tab-btn tab-active pb-2 font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition">
                     Monitor
                 </button>
-                <button id="tabSettings" onclick="setActiveTab('settings')" class="py-2 text-gray-500 hover:text-indigo-700 transition">
+                <button id="tabSettings" onclick="setActiveTab('settings')" class="tab-btn pb-2 font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition">
                     Instellingen
                 </button>
             </div>
         </header>
 
+        <!-- ================= MONITOR VIEW ================= -->
         <main id="monitorView" class="space-y-6">
-             <div class="flex justify-start items-center space-x-4 mb-6">
-                <button id="clearGraphButton"
-                        class="px-3 py-1 bg-gray-400 text-white font-semibold text-sm rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50"
-                        onclick="clearGraphSelection()"
-                        disabled>
-                    Grafiek Deselecteren
-                </button>
-
-                <button id="openChartButton"
-                        class="px-3 py-1 bg-gray-400 text-white font-semibold text-sm rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50"
-                        onclick="openMultiSensorGraph()"
-                        disabled>
+            
+            <!-- Toolbar -->
+            <div class="flex items-center space-x-3">
+                <button id="openChartButton" onclick="openMultiSensorGraph()" disabled class="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium text-sm rounded-md transition disabled:opacity-40">
                     Toon Grafiek (0)
                 </button>
+                <button id="clearGraphButton" onclick="clearGraphSelection()" disabled class="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium text-sm rounded-md transition disabled:opacity-40 hover:text-red-500 dark:hover:text-red-400">
+                    Selectie Wissen
+                </button>
             </div>
-            <div id="sensorContainer" class="space-y-6">
-                <div id="initialMessage" class="text-center text-gray-500 p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                    Wacht op sensor data... Zorg ervoor dat u verbonden bent.
+
+            <!-- Grid Container -->
+            <div id="sensorContainer" class="space-y-8 min-h-[300px]">
+                <!-- Placeholder -->
+                <div id="initialMessage" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
+                    <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <p class="text-gray-500 dark:text-gray-400 font-medium">Wacht op data...</p>
+                    <p class="text-sm text-gray-400">Verbind met het apparaat om te starten.</p>
                 </div>
             </div>
         </main>
         
+        <!-- ================= SETTINGS VIEW ================= -->
         <div id="settingsView" class="hidden space-y-6">
-            <div id="settingsHeader" class="flex justify-between items-center bg-gray-100 p-4 rounded-lg shadow-sm">
-                <p id="settingsStatus" class="text-sm text-gray-600">Instellingen ontvangen van apparaat. Klik op 'Update Instellingen' om wijzigingen te verzenden.</p>
-                <button id="sendSettingsButton" 
-                        onclick="sendAllChangedSettings()"
-                        class="px-4 py-2 bg-indigo-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 ease-in-out disabled:opacity-50"
-                        disabled>
-                    Update Instellingen (0)
-                </button>
+            
+            <!-- Settings Toolbar -->
+            <div class="flex flex-col sm:flex-row justify-between items-center bg-gray-50 dark:bg-gray-750 p-4 rounded-xl border border-gray-100 dark:border-gray-700 gap-4">
+                <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Apparaat Configuratie</span>
+                </div>
+                
+                <div class="flex space-x-3 w-full sm:w-auto">
+                    <!-- NIEUWE KNOP: Lees Instellingen Handmatig -->
+                    <button onclick="requestSettings()" class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-white font-medium text-sm rounded-lg transition">
+                        Lees Instellingen
+                    </button>
+
+                    <button id="sendSettingsButton" onclick="sendAllChangedSettings()" disabled class="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white font-medium text-sm rounded-lg shadow hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        Update (0)
+                    </button>
+                </div>
             </div>
             
+            <!-- Settings Grid -->
             <div id="settingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div id="initialSettingsMessage" class="md:col-span-3 text-center text-gray-500 p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                    Wacht op instellingsdefinities van het seriële apparaat.
+                <!-- Placeholder -->
+                <div id="initialSettingsMessage" class="md:col-span-3 flex flex-col items-center justify-center py-16 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
+                    <p class="text-gray-500 dark:text-gray-400">Nog geen instellingen ontvangen.</p>
+                    <button onclick="requestSettings()" class="mt-2 text-indigo-500 hover:underline text-sm">Klik hier om op te vragen</button>
                 </div>
             </div>
         </div>
 
     </div>
 
-    <div id="graphModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <div class="flex justify-between items-center border-b pb-3 mb-4">
-                <h2 id="graphModalTitle" class="text-xl font-bold text-gray-800">Geselecteerde Sensorgrafieken</h2>
-                <button onclick="closeGraphModal()" class="p-2 rounded-full hover:bg-gray-100 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x text-gray-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    <!-- GRAFIEK MODAL -->
+    <div id="graphModal" class="modal-overlay hidden" onclick="if(event.target === this) closeGraphModal()">
+        <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+            <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
+                <h2 class="text-xl font-bold">Sensor Analyse</h2>
+                <button onclick="closeGraphModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
 
-            <div class="flex justify-between items-center mb-4">
-                <div id="timescaleButtons" class="flex justify-start space-x-2">
-                    <button onclick="updateChart('60000')" data-duration="60000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-indigo-600 text-white">1 Minuut</button>
-                    <button onclick="updateChart('300000')" data-duration="300000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">5 Minuten</button>
-                    <button onclick="updateChart('900000')" data-duration="900000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">15 Minuten</button>
+            <div class="flex justify-between items-center mb-6">
+                <div id="timescaleButtons" class="flex space-x-2">
+                    <button onclick="updateChart('60000')" data-duration="60000" class="px-3 py-1 rounded text-sm font-medium bg-indigo-600 text-white transition">1 Min</button>
+                    <button onclick="updateChart('300000')" data-duration="300000" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">5 Min</button>
+                    <button onclick="updateChart('900000')" data-duration="900000" class="px-3 py-1 rounded text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition">15 Min</button>
                 </div>
-                
-                <button id="exportCsvButton" onclick="downloadRawSelectedData()"
-                        class="px-4 py-1 bg-emerald-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-emerald-600 transition duration-150 ease-in-out disabled:opacity-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 11.586V3a1 1 0 112 0v8.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                    Exporteer Geselecteerde Data
+                <button onclick="downloadRawSelectedData()" class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 font-medium text-sm flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    CSV Export
                 </button>
             </div>
 
-
-            <div class="relative h-96">
+            <div class="relative h-96 w-full">
                 <canvas id="sensorChart"></canvas>
             </div>
             
-            <div id="chartLegend" class="mt-6 p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                <p class="font-semibold mb-2 text-gray-700">Geselecteerde Sensoren:</p>
-                </div>
+            <div id="chartLegend" class="mt-6 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400"></div>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Vaste Canvas variabelen
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let app, db, auth;
-
-        // Functie om Firebase te initialiseren en in te loggen
-        async function initializeFirebase() {
-            try {
-                if (Object.keys(firebaseConfig).length === 0) {
-                    console.warn("Firebase configuratie ontbreekt. Functies die database vereisen zullen niet werken.");
-                    return;
-                }
-                setLogLevel('debug');
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Aangemeld met aangepaste token.");
-                } else {
-                    await signInAnonymously(auth);
-                    console.log("Anoniem aangemeld.");
-                }
-            } catch (error) {
-                console.error("Fout bij Firebase initialisatie of authenticatie:", error);
+    <!-- LOGICA SCRIPT -->
+    <script>
+        // --- 1. THEMA / DARK MODE LOGICA ---
+        function initTheme() {
+            // Check systeemvoorkeur of eerder opgeslagen keuze
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                updateThemeIcons(true);
+            } else {
+                document.documentElement.classList.remove('dark');
+                updateThemeIcons(false);
             }
         }
 
-        initializeFirebase();
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+                updateThemeIcons(false);
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+                updateThemeIcons(true);
+            }
+            // Forceer grafiek update voor kleurverandering
+            if (activeChart) {
+                activeChart.options.scales.x.grid.color = getChartGridColor();
+                activeChart.options.scales.y.grid.color = getChartGridColor();
+                activeChart.update();
+            }
+        }
 
-        // ----------------------------------------------------
-        // Seriële Communicatie en UI Logica
-        // ----------------------------------------------------
+        function updateThemeIcons(isDark) {
+            const moon = document.getElementById('iconMoon');
+            const sun = document.getElementById('iconSun');
+            if (isDark) {
+                moon.classList.add('hidden');
+                sun.classList.remove('hidden');
+            } else {
+                moon.classList.remove('hidden');
+                sun.classList.add('hidden');
+            }
+        }
 
-        // Globale variabelen voor seriële status en data
-        let port;
-        let reader;
-        let writer;
-        let activeChart = null; // Chart.js instantie
-        let sensorData = {}; // { "CategoryName": [sensor1, sensor2, ...], ... }
-        let selectedSensors = []; // Array van { category, name } objecten
-        let toastTimeout = null;
-        let isConnected = false; // Houdt de verbindingsstatus bij
+        function getChartGridColor() {
+            return document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        }
+
+        // Initialiseer thema direct
+        initTheme();
+
+        // --- 2. GLOBALE VARIABELEN ---
+        let port, reader, writer;
+        let sensorData = {}; 
+        let selectedSensors = []; 
+        let settingsDefinition = {}; 
+        let settingsChanged = new Set();
+        let isConnected = false;
+        let activeTab = 'monitor';
         
-        // Configuratie (Nieuw)
-        let settingsDefinition = {}; // De definitie van alle instellingen (van apparaat)
-        let settingsChanged = new Set(); // Set van ID's die gewijzigd zijn in de UI
-
-        const statusMessageEl = document.getElementById('statusMessage');
-        const connectButton = document.getElementById('connectButton');
-        const openChartButton = document.getElementById('openChartButton');
-        const clearGraphButton = document.getElementById('clearGraphButton'); 
-        const sensorContainerEl = document.getElementById('sensorContainer');
-        const initialMessageEl = document.getElementById('initialMessage');
-        const baudRateSelectEl = document.getElementById('baudRateSelect'); 
-        const baudRateWrapperEl = document.getElementById('baudRateWrapper');
-        const chartLegendEl = document.getElementById('chartLegend');
-        const toastNotificationEl = document.getElementById('toastNotification');
-        const toastTextEl = document.getElementById('toastText');
-        
-        // Configuratie elementen (Nieuw)
-        const settingsContainerEl = document.getElementById('settingsContainer');
-        const initialSettingsMessageEl = document.getElementById('initialSettingsMessage');
-        const sendSettingsButtonEl = document.getElementById('sendSettingsButton');
-
-        // GLOBALE VARIABELEN VOOR RENDERING THROTTLING
+        let activeChart = null;
         let needsRender = false;
         let renderTimeout = null;
-        const RENDER_INTERVAL = 100; // Max 10 FPS
-        let activeTab = 'monitor'; // Huidige actieve tab
 
-        // Kleuren voor de grafiek lijnen (Tailwind palet)
-        const CHART_COLORS = [
-            'rgb(79, 70, 229)',  // Indigo
-            'rgb(234, 179, 8)',  // Yellow
-            'rgb(239, 68, 68)',  // Red
-            'rgb(16, 185, 129)', // Emerald
-            'rgb(59, 130, 246)', // Blue
-            'rgb(168, 85, 247)', // Violet
-        ];
+        // --- DOM Elementen ---
+        const els = {
+            status: document.getElementById('statusMessage'),
+            connectBtn: document.getElementById('connectButton'),
+            sensorContainer: document.getElementById('sensorContainer'),
+            initialMsg: document.getElementById('initialMessage'),
+            baudWrapper: document.getElementById('baudRateWrapper'),
+            settingsContainer: document.getElementById('settingsContainer'),
+            settingsMsg: document.getElementById('initialSettingsMessage'),
+            sendSettingsBtn: document.getElementById('sendSettingsButton'),
+            openChartBtn: document.getElementById('openChartButton'),
+            clearGraphBtn: document.getElementById('clearGraphButton'),
+            toast: document.getElementById('toastNotification'),
+            toastText: document.getElementById('toastText'),
+            toastIcon: document.getElementById('toastIcon')
+        };
 
-        /**
-         * Schakelt tussen de Monitor en Instellingen weergave. (Nieuw)
-         */
+        // --- 3. TAB LOGICA ---
         window.setActiveTab = function(tab) {
             activeTab = tab;
+            
             document.getElementById('monitorView').classList.toggle('hidden', tab !== 'monitor');
             document.getElementById('settingsView').classList.toggle('hidden', tab !== 'settings');
             
-            document.getElementById('tabMonitor').classList.toggle('tab-active', tab === 'monitor');
-            document.getElementById('tabSettings').classList.toggle('tab-active', tab === 'settings');
-
-            if (tab === 'settings') {
-                // Her-render de instellingen om de laatste staat te tonen
-                renderSettingsControls();
+            const btnMonitor = document.getElementById('tabMonitor');
+            const btnSettings = document.getElementById('tabSettings');
+            
+            if (tab === 'monitor') {
+                btnMonitor.classList.add('tab-active');
+                btnSettings.classList.remove('tab-active');
+            } else {
+                btnMonitor.classList.remove('tab-active');
+                btnSettings.classList.add('tab-active');
+                // Alleen renderen bij tabwissel als er data is, niet continu
+                renderSettingsControls(); 
             }
         };
-        
-        /**
-         * Update de statusboodschap en styling.
-         */
-        function updateStatus(message, state = 'default') {
-            statusMessageEl.textContent = message;
-            statusMessageEl.className = 'font-medium text-sm whitespace-nowrap transition duration-300';
 
-            switch (state) {
-                case 'connected':
-                    statusMessageEl.classList.add('text-green-600');
-                    break;
-                case 'connecting':
-                    statusMessageEl.classList.add('text-yellow-600');
-                    break;
-                case 'error':
-                    statusMessageEl.classList.add('text-red-600');
-                    break;
-                case 'default':
-                default:
-                    statusMessageEl.classList.add('text-gray-600');
-                    break;
-            }
-        }
-
-        /**
-         * Schakelt de visuele vervaging van de sensorwaarden in/uit.
-         */
-        function toggleDataStale() {
-            if (isConnected) {
-                sensorContainerEl.classList.remove('data-stale');
-                document.getElementById('settingsView').classList.remove('data-stale');
-            } else {
-                sensorContainerEl.classList.add('data-stale');
-                document.getElementById('settingsView').classList.add('data-stale');
-            }
-        }
-
-        /**
-         * Update de "Toon Grafiek" en "Grafiek Deselecteren" knoppen met het aantal geselecteerde sensoren.
-         */
-        function updateChartButtonState() {
-            const count = selectedSensors.length;
-            openChartButton.textContent = `Toon Grafiek (${count})`;
-            openChartButton.disabled = count === 0;
-            clearGraphButton.disabled = count === 0; 
-            
-            clearGraphButton.textContent = `Grafiek Deselecteren`;
-
-            // Toon Grafiek (Emerald 500)
-            openChartButton.classList.toggle('bg-emerald-500', count > 0);
-            openChartButton.classList.toggle('hover:bg-emerald-600', count > 0);
-            openChartButton.classList.toggle('bg-gray-400', count === 0);
-            openChartButton.classList.toggle('hover:bg-gray-400', count === 0);
-
-            // Grafiek Deselecteren (Rose 500)
-            clearGraphButton.classList.toggle('bg-rose-500', count > 0);
-            clearGraphButton.classList.toggle('hover:bg-rose-600', count > 0);
-            clearGraphButton.classList.toggle('bg-gray-400', count === 0);
-            clearGraphButton.classList.toggle('hover:bg-gray-400', count === 0);
-        }
-        
-        /**
-         * Maakt de selectie van alle sensoren leeg.
-         */
-        window.clearGraphSelection = function() {
-            if (selectedSensors.length === 0) return;
-
-            selectedSensors = [];
-            
-            // Sluit de grafiek modal als deze open is
-            const modal = document.getElementById('graphModal');
-            if (!modal.classList.contains('hidden')) {
-                closeGraphModal();
-            }
-
-            updateChartButtonState();
-            updateSensorDisplays(); // Zorgt voor het visueel deselecteren van de kaarten
-            showMessage('Grafiek selectie gedeselecteerd.', false);
-        }
-
-        /**
-         * Update de UI met de huidige sensorData, maar op een gethrottlede manier.
-         */
-        function throttleRenderUI() {
-            if (renderTimeout) return; 
-
-            renderTimeout = setTimeout(() => {
-                if (needsRender) {
-                    updateSensorDisplays();
-                    // Zorg ervoor dat instellingen ook geüpdatet worden als de tab actief is
-                    if (activeTab === 'settings') {
-                         renderSettingsControls();
-                    }
-                    needsRender = false;
-                }
-                renderTimeout = null;
-            }, RENDER_INTERVAL);
-        }
-        
-        /**
-         * Helper functie om een unieke, veilige ID te maken.
-         */
-        function makeSensorId(category, name) {
-            return `${category.replace(/\s/g, '_')}-${name.replace(/\s/g, '_')}`;
-        }
-        
-        /**
-         * Helper functie om een unieke sleutel te maken voor opslag in selectedSensors.
-         */
-        function makeSensorKey(category, name) {
-            return `${category}|${name}`;
-        }
-
-        /**
-         * Zoek een sensor object op basis van de sleutel.
-         */
-        function getSensorByKey(key) {
-            const [category, name] = key.split('|');
-            return sensorData[category]?.find(s => s.name === name);
-        }
-
-        /**
-         * Toggle de selectie status van een sensor voor de grafiek.
-         */
-        function toggleSensorSelection(category, name) {
-            const key = makeSensorKey(category, name);
-            const sensor = getSensorByKey(key);
-            
-            // Alleen numerieke sensoren toestaan in de grafiek
-            if (sensor && sensor.type === 'text') {
-                 showMessage("Alleen numerieke sensorwaarden kunnen worden geselecteerd voor de grafiek.", true);
-                 return;
-            }
-
-            const index = selectedSensors.findIndex(s => makeSensorKey(s.category, s.name) === key);
-
-            if (index > -1) {
-                // Deselecteren
-                selectedSensors.splice(index, 1);
-            } else {
-                // Selecteren
-                selectedSensors.push({ category, name });
-            }
-
-            updateChartButtonState();
-            updateSensorDisplays(); 
-        }
-
-
-        /**
-         * Functie om de DOM-elementen gericht bij te werken (Patchen).
-         */
-        function updateSensorDisplays() {
-            const categories = Object.keys(sensorData);
-            
-            if (categories.length > 0 && initialMessageEl) {
-                initialMessageEl.classList.add('hidden');
-            }
-
-            // ... (Bestande updateSensorDisplays logica blijft hier ongewijzigd) ...
-            
-            categories.forEach(category => {
-                const sensors = sensorData[category];
-                const categoryId = category.replace(/\s/g, '_');
-                const gridId = `grid-${categoryId}`;
-                
-                let categoryGroupEl = document.getElementById(`category-${categoryId}`);
-                if (!categoryGroupEl) {
-                    categoryGroupEl = document.createElement('div');
-                    categoryGroupEl.id = `category-${categoryId}`;
-                    categoryGroupEl.className = 'category-group bg-gray-50 p-5 rounded-xl shadow-lg';
-                    categoryGroupEl.innerHTML = `
-                        <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">${category}</h2>
-                        <div id="${gridId}" class="sensor-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                        </div>
-                    `;
-                    sensorContainerEl.appendChild(categoryGroupEl);
-                }
-                
-                const gridEl = document.getElementById(gridId);
-
-                sensors.forEach(sensor => {
-                    const sensorId = makeSensorId(category, sensor.name);
-                    let sensorCardEl = document.getElementById(sensorId);
-
-                    if (sensor.type === 'text') {
-                        // --- TEKST BERICHT KAART RENDERING ---
-                        const latestEntry = sensor.history.length > 0 ? sensor.history[sensor.history.length - 1] : null;
-                        const latestMessage = latestEntry ? latestEntry.value : 'Geen bericht ontvangen';
-                        const latestTime = latestEntry ? new Date(latestEntry.time).toLocaleTimeString('nl-NL') : 'N/A';
-                        
-                        if (!sensorCardEl || sensorCardEl.classList.contains('sensor-card')) {
-                             if (sensorCardEl) sensorCardEl.remove();
-
-                            // Creëer NIEUWE tekst kaart
-                            sensorCardEl = document.createElement('div');
-                            sensorCardEl.id = sensorId;
-                            // Geen data-action="toggle-select" voor tekst
-                            sensorCardEl.className = `message-card bg-white p-4 rounded-lg shadow border-2 border-gray-200 transition duration-150 ease-in-out`;
-                            sensorCardEl.innerHTML = `
-                                <div class="flex justify-between items-start">
-                                    <p class="text-sm font-semibold text-gray-500 mb-1">${sensor.name}</p>
-                                    <span id="${sensorId}-time" class="text-xs text-gray-400">${latestTime}</span>
-                                </div>
-                                <p id="${sensorId}-message" class="text-lg font-medium text-gray-800 break-words mt-1 h-12 overflow-hidden">
-                                    ${latestMessage}
-                                </p>
-                            `;
-                            gridEl.appendChild(sensorCardEl);
-                        } else {
-                            // Patch bestaande tekst kaart
-                            const messageEl = document.getElementById(`${sensorId}-message`);
-                            const timeEl = document.getElementById(`${sensorId}-time`);
-                            
-                            if (messageEl) messageEl.textContent = latestMessage;
-                            if (timeEl) timeEl.textContent = latestTime;
-                        }
-                    } else {
-                        // --- NUMERIEKE SENSOR KAART RENDERING (Bestaande logica) ---
-                        const isSelected = selectedSensors.some(s => makeSensorKey(s.category, s.name) === makeSensorKey(category, sensor.name));
-                        
-                        const sensorValue = sensor.history.length > 0 ? sensor.history[sensor.history.length - 1].value : 'N/A';
-                        const valueColor = (typeof sensorValue === 'number' && sensor.maxRange && sensorValue > (sensor.maxRange * 0.8)) ? 'text-red-600' : 'text-green-600';
-                        const unitText = sensor.unit ? sensor.unit : '';
-
-                        // Icoon SVG voor een grafiek (Groen als geselecteerd, anders grijs)
-                        const chartIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart ${isSelected ? 'text-emerald-500' : 'text-gray-400'}"><path d="M3 3v18h18"/><path d="m18 8-5 5-4-4-5 5"/></svg>`;
-
-                        if (!sensorCardEl || sensorCardEl.classList.contains('message-card')) {
-                            // Creëer NIEUWE numerieke kaart of vervang oude tekstkaart
-                            if (sensorCardEl) sensorCardEl.remove();
-
-                            sensorCardEl = document.createElement('div');
-                            sensorCardEl.id = sensorId;
-                            sensorCardEl.setAttribute('data-action', 'toggle-select');
-                            sensorCardEl.setAttribute('data-name', sensor.name);
-                            sensorCardEl.setAttribute('data-category', category);
-
-                            sensorCardEl.className = `sensor-card bg-white p-4 rounded-lg shadow border-2 border-gray-200 cursor-pointer transition duration-150 ease-in-out hover:shadow-lg ${isSelected ? 'sensor-card-selected' : ''}`;
-                            sensorCardEl.innerHTML = `
-                                <div class="flex justify-between items-start">
-                                    <p class="text-sm font-semibold text-gray-500 mb-1">${sensor.name}</p>
-                                    <div id="${sensorId}-icon" class="p-1">
-                                        ${chartIconSvg}
-                                    </div>
-                                </div>
-                                <div class="flex items-baseline justify-between">
-                                    <span id="${sensorId}-value" class="text-4xl font-extrabold ${valueColor}">
-                                        ${sensorValue}
-                                    </span>
-                                    <span id="${sensorId}-unit" class="text-xl font-medium text-gray-600">
-                                        ${unitText}
-                                    </span>
-                                </div>
-                                <div class="mt-2 text-xs text-gray-400">
-                                    Bereik: ${sensor.minRange} - ${sensor.maxRange} ${unitText}
-                                </div>
-                            `;
-                            gridEl.appendChild(sensorCardEl);
-                        } else {
-                            // Patch (BIJWERKEN) van de bestaande numerieke kaart
-                            const valueEl = document.getElementById(`${sensorId}-value`);
-                            const unitEl = document.getElementById(`${sensorId}-unit`);
-                            const iconEl = document.getElementById(`${sensorId}-icon`);
-
-                            // Update selectie status van de kaart
-                            sensorCardEl.classList.toggle('sensor-card-selected', isSelected);
-
-                            // Update selectie icoon met groene/grijze grafiek
-                            if (iconEl) {
-                                iconEl.innerHTML = chartIconSvg;
-                            }
-
-                            if (valueEl) {
-                                valueEl.textContent = sensorValue;
-                                valueEl.className = `text-4xl font-extrabold ${valueColor}`;
-                            }
-                            if (unitEl) {
-                                unitEl.textContent = unitText;
-                            }
-                        }
-                    }
-                });
-            });
-        }
-
-
-        /**
-         * Toont een zwevende (toast) melding aan de gebruiker.
-         */
-        function showMessage(message, isError = false) {
-            // Wis vorige timer
-            if (toastTimeout) {
-                clearTimeout(toastTimeout);
-            }
-
-            // Stel tekst en stijl in
-            toastTextEl.textContent = message;
-            toastNotificationEl.classList.remove('bg-red-100', 'border-red-400', 'text-red-700', 'bg-green-100', 'border-green-400', 'text-green-700', 'hidden');
-            
-            if (isError) {
-                toastNotificationEl.classList.add('bg-red-100', 'border-l-4', 'border-red-500', 'text-red-700');
-            } else {
-                toastNotificationEl.classList.add('bg-green-100', 'border-l-4', 'border-green-500', 'text-green-700');
-            }
-
-            // Toon de melding
-            toastNotificationEl.classList.add('show');
-            
-            // Verberg de melding na 5 seconden
-            toastTimeout = setTimeout(() => {
-                toastNotificationEl.classList.remove('show');
-                setTimeout(() => {
-                    if (toastNotificationEl.classList.contains('show')) return;
-                    toastNotificationEl.classList.add('hidden');
-                }, 300); // Wacht op de CSS transitie om te eindigen
-            }, 5000);
-        }
-
-        /**
-         * Verwerkt een enkele JSON string regel van de seriële poort.
-         */
-        function processSensorData(jsonLine) {
-            try {
-                const data = JSON.parse(jsonLine.trim());
-
-                if (data.command === "SETTINGS_DEFINITION" && data.settings) {
-                    processSettingsDefinition(data.settings);
-                    return;
-                }
-                
-                // Controleer op minimale vereisten voor OF numerieke data OF een bericht
-                const isMessage = typeof data.message !== 'undefined';
-                const isSensorData = data.name && data.category && (typeof data.value !== 'undefined' || isMessage);
-                
-                if (!isSensorData) {
-                    // Stille waarschuwing voor onvolledige of onbekende data
-                    return;
-                }
-
-                const dataType = isMessage ? 'text' : 'numeric';
-                const category = data.category;
-                const name = data.name;
-                const timestamp = Date.now();
-                
-                // Belangrijk: haal de waarde of het bericht op
-                const newValueOrMessage = isMessage ? data.message : data.value;
-                const key = makeSensorKey(category, name);
-
-                if (!sensorData[category]) {
-                    sensorData[category] = [];
-                }
-
-                let existingSensor = sensorData[category].find(s => s.name === name);
-
-                if (!existingSensor) {
-                    existingSensor = {
-                        ...data,
-                        type: dataType, // <-- Belangrijke Type indicator
-                        history: [],
-                    };
-                    if (dataType === 'numeric') {
-                        // Zorg ervoor dat deze velden bestaan, zelfs als ze ontbreken in de eerste payload
-                        existingSensor.minRange = existingSensor.minRange || 0;
-                        existingSensor.maxRange = existingSensor.maxRange || 100;
-                        existingSensor.unit = existingSensor.unit || '';
-                        
-                        existingSensor.minObserved = newValueOrMessage;
-                        existingSensor.maxObserved = newValueOrMessage;
-                    }
-                    sensorData[category].push(existingSensor);
-                    showMessage(`Nieuw ${dataType === 'text' ? 'bericht' : 'sensor'} toegevoegd: ${name} (${category})`, false);
-                } else {
-                    // Type mismatch voorkomen
-                    if (existingSensor.type !== dataType) {
-                        console.error(`Type mismatch for sensor ${name}. Expected ${existingSensor.type}, got ${dataType}. Skipping update.`);
-                        return;
-                    }
-                    // Update bestaande metadata. We gebruiken Object.assign om eenheden, min/max ranges bij te werken
-                    Object.assign(existingSensor, data);
-                }
-                
-                // Geschiedenis update voor beide typen
-                existingSensor.history.push({ time: timestamp, value: newValueOrMessage });
-
-                if (existingSensor.history.length > 1000) {
-                    existingSensor.history.shift();
-                }
-
-                // Alleen numerieke updates
-                if (dataType === 'numeric') {
-                    if (newValueOrMessage < existingSensor.minObserved) {
-                        existingSensor.minObserved = newValueOrMessage;
-                    }
-                    if (newValueOrMessage > existingSensor.maxObserved) {
-                        existingSensor.maxObserved = newValueOrMessage;
-                    }
-                    
-                    // Grafiek update logica
-                    if (activeChart && selectedSensors.some(s => makeSensorKey(s.category, s.name) === key)) {
-                        const activeDuration = document.querySelector('#timescaleButtons button.bg-indigo-600')?.getAttribute('data-duration') || '60000';
-                        updateChart(activeDuration);
-                    }
-                }
-
-                needsRender = true;
-                throttleRenderUI();
-
-            } catch (e) {
-                console.error("Fout bij het parsen van JSON:", e, "Regel:", jsonLine);
-            }
-        }
-        
-        // ----------------------------------------------------
-        // Instellingen Definitie en Rendering (Nieuw)
-        // ----------------------------------------------------
-        
-        /**
-         * Verwerkt de inkomende instellingen definitie van het apparaat.
-         */
-        function processSettingsDefinition(settingsArray) {
-            settingsDefinition = {};
-            settingsChanged.clear(); 
-            
-            settingsArray.forEach(setting => {
-                if (setting.id) {
-                    settingsDefinition[setting.id] = {
-                        ...setting,
-                        originalValue: setting.value // Sla de originele waarde op voor vergelijking
-                    };
-                }
-            });
-            
-            showMessage(`Instellingsdefinities geladen. ${settingsArray.length} parameters beschikbaar.`, false);
-            renderSettingsControls();
-        }
-        
-        /**
-         * Render de dynamische instellingen besturingselementen.
-         */
-        function renderSettingsControls() {
-            const ids = Object.keys(settingsDefinition);
-            settingsContainerEl.innerHTML = '';
-            
-            if (ids.length === 0) {
-                settingsContainerEl.appendChild(initialSettingsMessageEl);
-                initialSettingsMessageEl.classList.remove('hidden');
-                sendSettingsButtonEl.disabled = true;
-                return;
-            }
-            
-            initialSettingsMessageEl.classList.add('hidden');
-            
-            ids.forEach(id => {
-                const setting = settingsDefinition[id];
-                const isChanged = settingsChanged.has(id);
-                
-                const card = document.createElement('div');
-                card.className = `p-4 border border-gray-200 rounded-lg shadow-sm transition duration-150 ${isChanged ? 'setting-changed' : 'bg-white'}`;
-                card.id = `setting-card-${id}`;
-                card.innerHTML = `
-                    <label for="input-${id}" class="block text-sm font-medium text-gray-700 mb-2">
-                        ${setting.label} (${id})
-                    </label>
-                    <div id="control-wrapper-${id}" class="flex items-center space-x-2">
-                        </div>
-                `;
-                
-                const controlWrapper = card.querySelector(`#control-wrapper-${id}`);
-                let inputElement;
-
-                // Dynamisch het juiste invoertype creëren
-                if (setting.type === 'value' || setting.type === 'text') {
-                    inputElement = document.createElement('input');
-                    inputElement.id = `input-${id}`;
-                    inputElement.name = id;
-                    inputElement.className = 'flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm';
-                    inputElement.value = setting.value;
-                    inputElement.onchange = (e) => handleSettingChange(id, e.target.value);
-
-                    if (setting.type === 'value') {
-                        inputElement.type = 'number';
-                        inputElement.min = setting.min !== undefined ? setting.min : '';
-                        inputElement.max = setting.max !== undefined ? setting.max : '';
-                        inputElement.step = setting.step !== undefined ? setting.step : 'any';
-                    } else if (setting.type === 'text') {
-                        inputElement.type = 'text';
-                        inputElement.maxLength = setting.maxLength || 255;
-                    }
-
-                    controlWrapper.appendChild(inputElement);
-                    
-                    if (setting.unit) {
-                        const unitSpan = document.createElement('span');
-                        unitSpan.className = 'text-sm text-gray-500 whitespace-nowrap';
-                        unitSpan.textContent = setting.unit;
-                        controlWrapper.appendChild(unitSpan);
-                    }
-                    
-                } else if (setting.type === 'select') {
-                    inputElement = document.createElement('select');
-                    inputElement.id = `input-${id}`;
-                    inputElement.name = id;
-                    inputElement.className = 'flex-grow px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm';
-                    inputElement.onchange = (e) => handleSettingChange(id, e.target.value);
-                    
-                    setting.options.forEach(option => {
-                        const optionEl = document.createElement('option');
-                        optionEl.value = option.key;
-                        optionEl.textContent = option.label;
-                        if (option.key == setting.value) {
-                            optionEl.selected = true;
-                        }
-                        inputElement.appendChild(optionEl);
-                    });
-                    
-                    controlWrapper.appendChild(inputElement);
-                }
-                
-                settingsContainerEl.appendChild(card);
-            });
-            
-            // Update de status van de "Update Instellingen" knop
-            updateSendSettingsButton();
-        }
-        
-        /**
-         * Behandelt een wijziging in een instelling.
-         */
-        function handleSettingChange(id, newValue) {
-            const setting = settingsDefinition[id];
-            
-            // Converteer de waarde naar het juiste type (voor numerieke vergelijking)
-            let typedNewValue = newValue;
-            if (setting.type === 'value') {
-                typedNewValue = parseFloat(newValue);
-            }
-            
-            // Controleer of de waarde echt veranderd is ten opzichte van de originele waarde
-            if (typedNewValue !== setting.originalValue) {
-                settingsChanged.add(id);
-                // Update de tijdelijke weergavewaarde
-                settingsDefinition[id].value = typedNewValue;
-            } else {
-                settingsChanged.delete(id);
-            }
-            
-            // Visuele feedback op de kaart
-            const cardEl = document.getElementById(`setting-card-${id}`);
-            if (cardEl) {
-                cardEl.classList.toggle('setting-changed', settingsChanged.has(id));
-            }
-
-            updateSendSettingsButton();
-        }
-
-        /**
-         * Update de status van de "Update Instellingen" knop.
-         */
-        function updateSendSettingsButton() {
-            const count = settingsChanged.size;
-            sendSettingsButtonEl.textContent = `Update Instellingen (${count})`;
-            sendSettingsButtonEl.disabled = count === 0 || !isConnected;
-        }
-
-        /**
-         * Verzendt alle gewijzigde instellingen naar de seriële poort.
-         */
-        window.sendAllChangedSettings = async function() {
-            if (settingsChanged.size === 0) return;
-            if (!writer) {
-                showMessage("Geen seriële verbinding beschikbaar om data te verzenden.", true);
-                return;
-            }
-
-            const encoder = new TextEncoder();
-            const changedSettingsArray = Array.from(settingsChanged);
-            
-            for (const id of changedSettingsArray) {
-                const setting = settingsDefinition[id];
-                const valueToSend = setting.value;
-                
-                const updatePayload = {
-                    command: "SET",
-                    id: id,
-                    value: valueToSend
-                };
-                
-                const jsonString = JSON.stringify(updatePayload) + '\n';
-                
-                try {
-                    await writer.write(encoder.encode(jsonString));
-                    
-                    // Markeer als verzonden door de originele waarde bij te werken
-                    setting.originalValue = valueToSend;
-                    settingsChanged.delete(id);
-                    
-                    // Verwijder de visuele feedback
-                    const cardEl = document.getElementById(`setting-card-${id}`);
-                    if (cardEl) {
-                        cardEl.classList.remove('setting-changed');
-                    }
-                    
-                    console.log(`Verzonden: ${jsonString.trim()}`);
-                    
-                } catch (e) {
-                    showMessage(`Fout bij verzenden van instelling ${id}: ${e.message}`, true);
-                    break; 
-                }
-            }
-            
-            showMessage(`${changedSettingsArray.length} instelling(en) succesvol bijgewerkt.`, false);
-            updateSendSettingsButton();
-        }
-
-
-        // ----------------------------------------------------
-        // Seriële Lezen/Schrijven Logica
-        // ----------------------------------------------------
-
-        /**
-         * Stuurt een JSON-object als een JSON string, gevolgd door een newline,
-         * naar de seriële poort.
-         * @param {object} data - Het te verzenden JSON-object.
-         */
-        async function sendSerialData(data) {
-            if (!writer) {
-                showMessage("Fout: Kan geen data verzenden. Seriële poort is niet open.", true);
-                return;
-            }
-
-            const encoder = new TextEncoder();
-            const jsonString = JSON.stringify(data) + '\n';
-            
-            try {
-                await writer.write(encoder.encode(jsonString));
-                console.log(`Verzonden: ${jsonString.trim()}`);
-            } catch (e) {
-                showMessage(`Fout bij verzenden van commando: ${e.message}`, true);
-            }
-        }
-
-        /**
-         * Leest data van de seriële poort.
-         */
-        async function readSerialPort() {
-            isConnected = true; 
-            toggleDataStale();  // ZET VERVAGING UIT
-
-            updateStatus('Verbonden en leest data...', 'connected');
-            connectButton.textContent = 'Verbreken';
-            // BAUD RATE VERBERGEN
-            baudRateWrapperEl.classList.add('hidden'); 
-            
-            writer = port.writable.getWriter(); // Maak een writer klaar
-            
-            const textDecoder = new TextDecoderStream();
-            const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-            
-            reader = textDecoder.readable
-                .pipeThrough(new TransformStream(new LineBreakTransformer()))
-                .getReader();
-
-            try {
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) {
-                        break;
-                    }
-                    processSensorData(value);
-                }
-            } catch (error) {
-                if (error.name !== 'InvalidStateError') {
-                   showMessage(`Leesfout: ${error.message}`, true);
-                   updateStatus(`Leesfout: ${error.message}`, 'error');
-                }
-            } finally {
-                if (reader) {
-                    reader.releaseLock();
-                    reader = null;
-                }
-                
-                if (writer) { // Sluit de writer af
-                    writer.releaseLock();
-                    writer = null;
-                }
-                
-                await readableStreamClosed.catch(() => { /* Negeer fout bij sluiten */ });
-                port = null;
-                connectButton.textContent = 'Verbind';
-                updateStatus('Klaar om te verbinden.', 'default');
-                // BAUD RATE TONEN
-                baudRateWrapperEl.classList.remove('hidden'); 
-                showMessage('Verbinding verbroken. Data is nu statisch en vervaagd.', false);
-                
-                isConnected = false; // ZET STATUS OP VERBROKEN
-                toggleDataStale();  // ZET VERVAGING AAN
-                updateSendSettingsButton(); // Update knop status
-
-                if (renderTimeout) {
-                    clearTimeout(renderTimeout);
-                    renderTimeout = null;
-                    needsRender = false;
-                }
-            }
-        }
-
-        /**
-         * Transformer Klasse om de inkomende stream op regels te splitsen.
-         */
-        class LineBreakTransformer {
-            constructor() {
-                this.chunks = '';
-            }
-
-            transform(chunk, controller) {
-                this.chunks += chunk;
-                const lines = this.chunks.split('\n');
-                this.chunks = lines.pop();
-                lines.forEach(line => controller.enqueue(line));
-            }
-
-            flush(controller) {
-                controller.enqueue(this.chunks);
-            }
-        }
-
-
-        /**
-         * Vraagt de gebruiker om een seriële poort te selecteren en maakt verbinding.
-         */
-        window.connectSerialPort = async function() {
+        // --- 4. VERBINDING LOGICA ---
+        async function connectSerialPort() {
             if (port) {
-                // Verbreek de verbinding
-                if (reader) {
-                    await reader.cancel(); 
-                }
+                if (reader) await reader.cancel();
                 return;
             }
 
             if (!('serial' in navigator)) {
-                showMessage('Web Serial API wordt niet ondersteund in deze browser. Gebruik Chrome, Edge of Opera.', true);
-                updateStatus('API niet ondersteund.', 'error');
+                showToast("Web Serial API niet ondersteund.", "error");
                 return;
             }
 
             try {
-                connectButton.disabled = true;
-                updateStatus('Wacht op poort selectie...', 'connecting');
-
-                const baudRate = parseInt(baudRateSelectEl.value, 10);
-
-                port = await navigator.serial.requestPort({ filters: [] });
-
-                await port.open({ baudRate: baudRate });
-
-                updateStatus('Verbinding tot stand gebracht. Start lezen...', 'connected');
-                connectButton.disabled = false;
+                els.connectBtn.disabled = true;
+                els.status.textContent = "Koppelen...";
                 
-                // BAUD RATE VERBERGEN BIJ SUCCES
-                baudRateWrapperEl.classList.add('hidden'); 
-                
-                readSerialPort();
-                updateSendSettingsButton();
-                
-                // 🌟 TOEVOEGING: Vraag Instellingen op na verbinding (L723) 🌟
-                await sendSerialData({ command: "REQUEST_SETTINGS" });
+                const baud = parseInt(document.getElementById('baudRateSelect').value);
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: baud });
 
-            } catch (error) {
-                connectButton.disabled = false;
+                els.status.textContent = "Verbonden";
+                els.connectBtn.textContent = "Verbreken";
+                els.connectBtn.classList.replace('bg-indigo-600', 'bg-red-600');
+                els.connectBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
+                els.baudWrapper.classList.add('hidden');
                 
-                if (error.name === 'NotFoundError') {
-                    showMessage('Geen seriële poort geselecteerd.', true);
-                    updateStatus('Klaar om te verbinden.', 'default');
-                } else {
-                    showMessage(`Verbindingsfout: ${error.message}`, true);
-                    updateStatus('Fout: ' + error.message, 'error');
-                }
-                port = null; 
-                connectButton.textContent = 'Verbind';
-                // BAUD RATE TONEN BIJ FOUT
-                baudRateWrapperEl.classList.remove('hidden'); 
+                toggleDataStale(false);
+                isConnected = true;
+                els.connectBtn.disabled = false;
+
+                // Start leeslus
+                readSerialLoop();
+
+                // STAP 5: Vraag direct settings op
+                requestSettings();
+
+            } catch (err) {
+                console.error(err);
+                els.connectBtn.disabled = false;
+                els.status.textContent = "Fout";
+                showToast("Verbindingsfout: " + err.message, "error");
             }
         }
 
-        /**
-         * Opent de modal en toont de grafiek voor de geselecteerde sensoren.
-         */
-        window.openMultiSensorGraph = function() {
-            if (selectedSensors.length === 0) {
-                showMessage("Selecteer minimaal één sensor om een grafiek te tonen.", true);
-                return;
+        async function requestSettings() {
+            await sendSerialData({ command: "REQUEST_SETTINGS" });
+            showToast("Instellingen opgevraagd...", "info");
+        }
+
+        async function sendSerialData(data) {
+            if (!port || !port.writable) return;
+            if (!writer) writer = port.writable.getWriter();
+            
+            try {
+                const enc = new TextEncoder();
+                await writer.write(enc.encode(JSON.stringify(data) + '\n'));
+            } catch (e) {
+                console.error("Send error", e);
+            } finally {
+                writer.releaseLock();
+                writer = null;
+            }
+        }
+
+        async function readSerialLoop() {
+            const decoder = new TextDecoderStream();
+            const readableStreamClosed = port.readable.pipeTo(decoder.writable);
+            reader = decoder.readable.pipeThrough(new TransformStream(new LineBreakTransformer())).getReader();
+
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) handleSerialLine(value);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                await cleanUpConnection(readableStreamClosed);
+            }
+        }
+
+        async function cleanUpConnection(readableStreamClosed) {
+            if (reader) reader.releaseLock();
+            if (writer) writer.releaseLock();
+            await readableStreamClosed.catch(() => {}); 
+            await port.close();
+            
+            port = null; reader = null; writer = null; isConnected = false;
+            
+            els.status.textContent = "Niet verbonden";
+            els.connectBtn.textContent = "Verbinden";
+            els.connectBtn.classList.replace('bg-red-600', 'bg-indigo-600');
+            els.connectBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+            els.baudWrapper.classList.remove('hidden');
+            
+            toggleDataStale(true);
+        }
+
+        class LineBreakTransformer {
+            constructor() { this.chunks = ""; }
+            transform(chunk, controller) {
+                this.chunks += chunk;
+                const lines = this.chunks.split("\n");
+                this.chunks = lines.pop();
+                lines.forEach(line => controller.enqueue(line));
+            }
+            flush(controller) { controller.enqueue(this.chunks); }
+        }
+
+        function handleSerialLine(line) {
+            try {
+                const data = JSON.parse(line.trim());
+                
+                // 1. Settings Definitie
+                if (data.command === "SETTINGS_DEFINITION" && data.settings) {
+                    processSettingsDefinition(data.settings);
+                    return;
+                }
+
+                // 2. Sensor Data
+                if (data.name && data.category && (data.value !== undefined || data.message !== undefined)) {
+                    processSensorData(data);
+                }
+            } catch (e) {
+                // Negeer niet-JSON regels
+            }
+        }
+
+        // --- 5. SENSOR VERWERKING ---
+        function processSensorData(data) {
+            const key = data.category + '|' + data.name;
+            const isMsg = data.message !== undefined;
+            
+            if (!sensorData[data.category]) sensorData[data.category] = [];
+            
+            let sensor = sensorData[data.category].find(s => s.name === data.name);
+            if (!sensor) {
+                sensor = { 
+                    ...data, 
+                    type: isMsg ? 'text' : 'numeric', 
+                    history: [] 
+                };
+                sensorData[data.category].push(sensor);
             }
 
-            document.getElementById('graphModal').classList.remove('hidden');
+            // Update waarden
+            const val = isMsg ? data.message : data.value;
+            sensor.history.push({ time: Date.now(), value: val });
+            
+            // FIX: Buffer verhoogd van 500 naar 10000. 
+            // 500 punten @ 10Hz = 50 seconden. 
+            // 10000 punten @ 10Hz = 1000 seconden (~16 min).
+            if (sensor.history.length > 10000) sensor.history.shift();
+            
+            // Metadata update (min/max/unit kan veranderen)
+            Object.assign(sensor, data); 
 
-            // Standaard tijdschaal: 1 minuut (60000 ms)
-            updateChart('60000');
-        };
+            // Trigger UI update (throttled)
+            needsRender = true;
+            throttleUI();
+        }
 
-        // ------------------------------------------------------------------
-        // EVENT DELEGATION voor Sensor Selectie
-        // ------------------------------------------------------------------
-        document.addEventListener('DOMContentLoaded', () => {
-            sensorContainerEl.addEventListener('click', (event) => {
-                let targetCard = event.target.closest('[data-action="toggle-select"]');
+        function throttleUI() {
+            if (renderTimeout) return;
+            renderTimeout = setTimeout(() => {
+                if (needsRender) {
+                    renderSensors();
+                    // Update grafiek als open
+                    if (activeChart) updateChartFromHistory();
+                    needsRender = false;
+                }
+                renderTimeout = null;
+            }, 100); // 10 FPS max
+        }
 
-                if (targetCard) {
-                    event.preventDefault(); 
+        function renderSensors() {
+            els.initialMsg.classList.add('hidden');
+            
+            for (const cat in sensorData) {
+                const catId = cat.replace(/\s/g, '_');
+                let group = document.getElementById('cat-' + catId);
+                
+                if (!group) {
+                    group = document.createElement('div');
+                    group.id = 'cat-' + catId;
+                    group.className = "mb-8";
+                    group.innerHTML = `
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-3 border-b border-gray-200 dark:border-gray-700 pb-1">${cat}</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="grid-${catId}"></div>
+                    `;
+                    els.sensorContainer.appendChild(group);
+                }
+                
+                const grid = document.getElementById('grid-' + catId);
+                
+                sensorData[cat].forEach(sensor => {
+                    const id = `s-${catId}-${sensor.name.replace(/\s/g, '_')}`;
+                    const lastPt = sensor.history[sensor.history.length - 1];
+                    const val = lastPt ? lastPt.value : '-';
+                    const isNum = sensor.type === 'numeric';
+                    const isSelected = selectedSensors.some(s => s.id === id);
+
+                    let card = document.getElementById(id);
                     
-                    const name = targetCard.getAttribute('data-name');
-                    const category = targetCard.getAttribute('data-category');
-
-                    if (name && category) {
-                        toggleSensorSelection(category, name);
+                    if (!card) {
+                        card = document.createElement('div');
+                        card.id = id;
+                        // Click handler voor selectie
+                        if (isNum) {
+                            card.onclick = () => toggleSelection(id, cat, sensor.name);
+                            card.className = "sensor-card relative bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:shadow-md transition duration-200";
+                        } else {
+                            card.className = "message-card bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 shadow-sm";
+                        }
+                        
+                        card.innerHTML = isNum ? `
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">${sensor.name}</span>
+                                <div id="icon-${id}" class="transition-colors duration-200">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline gap-1">
+                                <span id="val-${id}" class="text-2xl font-bold text-gray-800 dark:text-gray-100 truncate"></span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">${sensor.unit || ''}</span>
+                            </div>
+                        ` : `
+                            <div class="flex justify-between mb-1">
+                                <span class="text-xs font-semibold text-indigo-500 dark:text-indigo-400 uppercase">${sensor.name}</span>
+                                <span class="text-xs text-gray-400" id="time-${id}"></span>
+                            </div>
+                            <p id="msg-${id}" class="text-sm font-medium text-gray-800 dark:text-gray-200 break-words leading-tight"></p>
+                        `;
+                        grid.appendChild(card);
                     }
-                }
-            });
-        });
 
-        // ------------------------------------------------------------------
-        // GRAFIEK LOGICA (Aangepast voor multi-dataset)
-        // ------------------------------------------------------------------
-        
-        /**
-         * Sluit de grafiek modal.
-         */
-        window.closeGraphModal = function() {
-            document.getElementById('graphModal').classList.add('hidden');
-            if (activeChart) {
-                activeChart.destroy();
-                activeChart = null;
+                    // Update Content
+                    if (isNum) {
+                        const valEl = document.getElementById(`val-${id}`);
+                        if (valEl.textContent != val) valEl.textContent = typeof val === 'number' ? val.toFixed(2).replace(/[.,]00$/, "") : val;
+                        
+                        // FIX: Robuuste dark mode kleurenselectie
+                        const iconEl = document.getElementById(`icon-${id}`);
+                        if (isSelected) {
+                            card.classList.add('sensor-card-selected');
+                            // Helder indigo in beide modi, maar aangepast voor contrast
+                            iconEl.className = "text-indigo-500 dark:text-indigo-400";
+                        } else {
+                            card.classList.remove('sensor-card-selected');
+                            // Grijs in beide modi
+                            iconEl.className = "text-gray-300 dark:text-gray-600";
+                        }
+                    } else {
+                        document.getElementById(`msg-${id}`).textContent = val;
+                        document.getElementById(`time-${id}`).textContent = new Date(lastPt.time).toLocaleTimeString();
+                    }
+                });
             }
-            // Reset knopstijlen
-            document.querySelector('#timescaleButtons button[data-duration="60000"]').classList.add('bg-indigo-600', 'text-white');
-            document.querySelectorAll('#timescaleButtons button:not([data-duration="60000"])').forEach(btn => {
-                btn.classList.remove('bg-indigo-600', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
-            });
-        };
-
-        /**
-         * Bouwt de legenda van de grafiek.
-         */
-        function buildLegend(datasets) {
-            let html = '<p class="font-semibold mb-2 text-gray-700">Geselecteerde Sensoren:</p><div class="flex flex-wrap gap-4">';
-            
-            datasets.forEach(dataset => {
-                const color = dataset.borderColor;
-                const name = dataset.label;
-                html += `
-                    <div class="flex items-center space-x-2">
-                        <span class="w-3 h-3 rounded-full" style="background-color: ${color};"></span>
-                        <span class="text-sm text-gray-700">${name}</span>
-                    </div>
-                `;
-            });
-
-            html += '</div>';
-            chartLegendEl.innerHTML = html;
         }
 
-
-        /**
-         * Filtert data en tekent de grafiek.
-         * @param {string} durationMs - De tijdsduur in milliseconden ('60000', '300000', etc.).
-         */
-        window.updateChart = function(durationMs) {
-            if (selectedSensors.length === 0) return;
+        // --- 6. INSTELLINGEN LOGICA (GEFIXT) ---
+        
+        function processSettingsDefinition(newSettings) {
+            // Sla definities op
+            newSettings.forEach(s => {
+                settingsDefinition[s.id] = { ...s, originalValue: s.value };
+            });
             
-            const now = Date.now();
-            const timeLimit = now - parseInt(durationMs, 10);
-            
-            let datasets = [];
-            let allLabels = [];
-            let minY = Infinity;
-            let maxY = -Infinity;
+            // Render maar 1 keer per definitie-update, NIET bij elke sensor tick
+            renderSettingsControls();
+            showToast("Instellingen geladen", "success");
+        }
 
-            // 1. Maak datasets voor elke geselecteerde sensor
-            selectedSensors.forEach((sRef, index) => {
-                const sensor = getSensorByKey(makeSensorKey(sRef.category, sRef.name));
-                if (!sensor || sensor.type !== 'numeric') return; 
+        function renderSettingsControls() {
+            els.settingsMsg.classList.add('hidden');
+            const container = els.settingsContainer;
 
-                const filteredData = sensor.history.filter(point => point.time >= timeLimit);
-                const dataValues = filteredData.map(point => point.value);
+            Object.values(settingsDefinition).forEach(setting => {
+                const elId = `input-${setting.id}`;
+                let card = document.getElementById(`card-${setting.id}`);
                 
-                dataValues.forEach(val => {
-                    if (val < minY) minY = val;
-                    if (val > maxY) maxY = val;
-                });
+                // 1. Creëer kaart als hij niet bestaat (Structuur)
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${setting.id}`;
+                    card.className = "bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors";
+                    
+                    let inputHtml = '';
+                    if (setting.type === 'select') {
+                        const opts = setting.options.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
+                        inputHtml = `<select id="${elId}" onchange="handleSettingChange('${setting.id}', this.value)" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">${opts}</select>`;
+                    } else {
+                        const type = setting.type === 'value' ? 'number' : 'text';
+                        const step = setting.step || 'any';
+                        inputHtml = `<div class="relative">
+                            <input type="${type}" id="${elId}" step="${step}" onchange="handleSettingChange('${setting.id}', this.value)" class="block w-full p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            ${setting.unit ? `<div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500 text-sm">${setting.unit}</div>` : ''}
+                        </div>`;
+                    }
 
-                if (index === 0) {
-                    allLabels = filteredData.map(point => new Date(point.time).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+                    card.innerHTML = `
+                        <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">${setting.label}</label>
+                        ${inputHtml}
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">ID: ${setting.id}</p>
+                    `;
+                    container.appendChild(card);
                 }
 
-                const color = CHART_COLORS[index % CHART_COLORS.length];
-
-                datasets.push({
-                    label: `${sensor.name} (${sensor.unit || 'waarde'})`,
-                    data: dataValues,
-                    borderColor: color,
-                    backgroundColor: color,
-                    borderWidth: 2,
-                    pointRadius: 0, 
-                    tension: 0.1,
-                    fill: false, 
-                    yAxisID: 'y' 
-                });
-            });
-
-            // 2. Bepaal de definitieve schaal met padding
-            const range = maxY - minY;
-            const padding = range * 0.05 || (minY === maxY ? 0.5 : 1); 
-            const finalMinY = minY === Infinity ? 0 : minY - padding;
-            const finalMaxY = maxY === -Infinity ? 100 : maxY + padding;
-
-            // 3. Bouw of update de Chart.js instantie
-            if (activeChart) {
-                activeChart.data.labels = allLabels;
-                activeChart.data.datasets = datasets;
-                activeChart.options.scales.y.min = finalMinY;
-                activeChart.options.scales.y.max = finalMaxY;
-                activeChart.options.plugins.title.text = `Laatste ${parseInt(durationMs, 10) / 60000} Minuut${parseInt(durationMs, 10) === 60000 ? '' : 'en'} (Meerdere Sensoren)`;
-                activeChart.update();
-
-            } else {
-                const ctx = document.getElementById('sensorChart').getContext('2d');
-                activeChart = new Chart(ctx, {
-                    type: 'line', // Zorg ervoor dat het een lijngrafiek blijft
-                    data: {
-                        labels: allLabels,
-                        datasets: datasets
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: false,
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                min: finalMinY,
-                                max: finalMaxY,
-                                title: {
-                                    display: true,
-                                    text: 'Waarde',
-                                    font: { size: 14, weight: 'bold' }
-                                }
-                            },
-                            x: {
-                                ticks: {
-                                    maxTicksLimit: 10
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            title: {
-                                display: true,
-                                text: `Laatste ${parseInt(durationMs, 10) / 60000} Minuut${parseInt(durationMs, 10) === 60000 ? '' : 'en'} (Meerdere Sensoren)`,
-                                font: { size: 16, weight: 'bold' }
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
-                            }
+                // 2. Update Waarde (Alleen als de gebruiker het niet heeft aangepast)
+                // Dit voorkomt dat de cursor verspringt of dropdown reset terwijl je typt.
+                if (!settingsChanged.has(setting.id)) {
+                    const input = document.getElementById(elId);
+                    if (input) {
+                        // Check of waarde echt anders is om onnodige DOM updates te voorkomen
+                        if (input.value != setting.value) {
+                             input.value = setting.value;
                         }
                     }
-                });
+                }
+            });
+        }
+
+        function handleSettingChange(id, value) {
+            const def = settingsDefinition[id];
+            let val = value;
+            if (def.type === 'value') val = parseFloat(value);
+            
+            // Vergelijk met origineel (zoals ontvangen van ESP)
+            if (val != def.originalValue) {
+                settingsChanged.add(id);
+                // Update tijdelijke lokale waarde
+                settingsDefinition[id].value = val;
+                document.getElementById(`card-${id}`).classList.add('setting-changed');
+            } else {
+                settingsChanged.delete(id);
+                document.getElementById(`card-${id}`).classList.remove('setting-changed');
             }
             
-            // 4. Update de handmatige legenda
-            buildLegend(datasets);
+            updateSendButton();
+        }
 
-            // 5. Update actieve knop stijl
-            document.querySelectorAll('#timescaleButtons button').forEach(btn => {
-                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
-            });
-            document.querySelector(`#timescaleButtons button[data-duration="${durationMs}"]`).classList.add('bg-indigo-600', 'text-white', 'shadow-md');
-        };
-        
-        // ------------------------------------------------------------------
-        // CSV EXPORT LOGICA
-        // ------------------------------------------------------------------
+        function updateSendButton() {
+            const count = settingsChanged.size;
+            els.sendSettingsBtn.textContent = count > 0 ? `Update (${count})` : "Update (0)";
+            els.sendSettingsBtn.disabled = count === 0;
+            els.sendSettingsBtn.className = count > 0 
+                ? "flex-1 sm:flex-none px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-lg shadow transition"
+                : "flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white font-medium text-sm rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed";
+        }
 
-        /**
-         * Downloadt de volledige ruwe historische data voor alle geselecteerde sensoren.
-         */
-        window.downloadRawSelectedData = function() {
-            if (selectedSensors.length === 0) {
-                showMessage("Geen sensoren geselecteerd om te exporteren.", true);
-                return;
+        async function sendAllChangedSettings() {
+            if (!isConnected) return;
+            
+            for (const id of settingsChanged) {
+                const setting = settingsDefinition[id];
+                await sendSerialData({ command: "SET", id: id, value: setting.value });
+                
+                // Reset status
+                setting.originalValue = setting.value; 
+                document.getElementById(`card-${id}`).classList.remove('setting-changed');
             }
+            
+            settingsChanged.clear();
+            updateSendButton();
+            showToast("Instellingen bijgewerkt", "success");
+        }
 
-            const csvRows = [];
-            // CSV Headers
-            csvRows.push("Timestamp (ms),Tijd (ISO),Categorie,Naam,Waarde,Eenheid");
+        // --- 7. GRAFIEK & SELECTIE LOGICA ---
+        function toggleSelection(id, category, name) {
+            const idx = selectedSensors.findIndex(s => s.id === id);
+            if (idx >= 0) {
+                selectedSensors.splice(idx, 1);
+            } else {
+                selectedSensors.push({ id, category, name });
+            }
+            renderSensors(); // Update visuals
+            updateGraphButtons();
+        }
 
-            let allDataPoints = [];
+        function clearGraphSelection() {
+            selectedSensors = [];
+            renderSensors();
+            updateGraphButtons();
+            closeGraphModal();
+        }
 
-            // 1. Verzamel alle historische data voor geselecteerde sensoren
-            selectedSensors.forEach(sRef => {
-                const sensor = getSensorByKey(makeSensorKey(sRef.category, sRef.name));
-                if (sensor && sensor.type === 'numeric') {
-                    // Gebruik de volledige historie, ongeacht de huidige grafiek filtering
-                    sensor.history.forEach(point => {
-                        allDataPoints.push({
-                            time: point.time,
-                            category: sRef.category,
-                            name: sRef.name,
-                            value: point.value,
-                            unit: sensor.unit || '',
-                        });
+        function updateGraphButtons() {
+            const count = selectedSensors.length;
+            els.openChartBtn.textContent = `Toon Grafiek (${count})`;
+            els.openChartBtn.disabled = count === 0;
+            els.clearGraphBtn.disabled = count === 0;
+            
+            if (count > 0) {
+                els.openChartBtn.classList.replace('bg-gray-200', 'bg-emerald-500');
+                els.openChartBtn.classList.replace('text-gray-500', 'text-white');
+                els.openChartBtn.classList.add('hover:bg-emerald-600');
+            } else {
+                els.openChartBtn.classList.add('bg-gray-200', 'text-gray-500');
+                els.openChartBtn.classList.remove('bg-emerald-500', 'text-white', 'hover:bg-emerald-600');
+            }
+        }
+
+        function openMultiSensorGraph() {
+            if (selectedSensors.length === 0) return;
+            document.getElementById('graphModal').classList.remove('hidden');
+            if (!activeChart) initChart();
+            updateChart('60000'); // Default 1 min
+        }
+        
+        function closeGraphModal() {
+            document.getElementById('graphModal').classList.add('hidden');
+        }
+
+        // --- CHART.JS CONFIG ---
+        let currentDuration = 60000;
+        
+        function initChart() {
+            const ctx = document.getElementById('sensorChart').getContext('2d');
+            activeChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { 
+                            type: 'linear', 
+                            grid: { color: getChartGridColor() },
+                            ticks: { 
+                                callback: function(val) { return new Date(val).toLocaleTimeString(); },
+                                color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563'
+                            }
+                        },
+                        y: { 
+                            grid: { color: getChartGridColor() },
+                            ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(duration) {
+            currentDuration = parseInt(duration);
+            updateChartFromHistory();
+            
+            // Knoppen styling reset
+            document.querySelectorAll('#timescaleButtons button').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+            });
+            const activeBtn = document.querySelector(`button[data-duration="${duration}"]`);
+            if(activeBtn) {
+                 activeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                 activeBtn.classList.add('bg-indigo-600', 'text-white');
+            }
+        }
+
+        function updateChartFromHistory() {
+            if (!activeChart) return;
+            const now = Date.now();
+            const limit = now - currentDuration;
+            const datasets = [];
+            const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+            selectedSensors.forEach((sel, i) => {
+                const sData = sensorData[sel.category].find(s => s.name === sel.name);
+                if (!sData) return;
+
+                const pts = sData.history.filter(p => p.time > limit);
+                datasets.push({
+                    label: sel.name,
+                    data: pts.map(p => ({ x: p.time, y: p.value })),
+                    borderColor: colors[i % colors.length],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.2
+                });
+            });
+
+            activeChart.data.datasets = datasets;
+            activeChart.options.scales.x.min = limit;
+            activeChart.options.scales.x.max = now;
+            activeChart.update();
+            
+            // Update Legend
+            const legend = document.getElementById('chartLegend');
+            legend.innerHTML = datasets.map((d, i) => `
+                <div class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color:${d.borderColor}"></span>${d.label}</div>
+            `).join('');
+        }
+        
+        // --- 8. HELPERS ---
+        function showToast(msg, type) {
+            els.toastText.textContent = msg;
+            els.toast.classList.remove('border-red-500', 'border-emerald-500', 'border-blue-500');
+            els.toast.classList.add('show');
+            
+            let color = 'border-blue-500';
+            let icon = '<svg class="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+            
+            if (type === 'error') {
+                color = 'border-red-500';
+                icon = '<svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+            } else if (type === 'success') {
+                color = 'border-emerald-500';
+                icon = '<svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            }
+            
+            els.toast.classList.add(color);
+            els.toastIcon.innerHTML = icon;
+
+            setTimeout(() => els.toast.classList.remove('show'), 3000);
+        }
+
+        function toggleDataStale(isStale) {
+            if (isStale) {
+                document.body.classList.add('data-stale');
+            } else {
+                document.body.classList.remove('data-stale');
+            }
+        }
+        
+        function downloadRawSelectedData() {
+            if (selectedSensors.length === 0) return;
+            let csv = "Timestamp,ISO Time,Category,Name,Value,Unit\n";
+            
+            selectedSensors.forEach(sel => {
+                const sData = sensorData[sel.category].find(s => s.name === sel.name);
+                if (sData) {
+                    sData.history.forEach(pt => {
+                        csv += `${pt.time},${new Date(pt.time).toISOString()},"${sel.category}","${sel.name}",${pt.value},"${sData.unit||''}"\n`;
                     });
                 }
             });
             
-            if (allDataPoints.length === 0) {
-                 showMessage("Geen datapunten in de geschiedenis om te exporteren.", true);
-                 return;
-            }
-
-            // 2. Sorteer alle punten op tijdstempel
-            allDataPoints.sort((a, b) => a.time - b.time);
-
-            // 3. Converteer naar CSV-rijen
-            allDataPoints.forEach(p => {
-                // Gebruik ISO-tijd voor een eenduidige, wereldwijde tijdsaanduiding
-                const timeString = new Date(p.time).toISOString(); 
-                
-                // Zorg ervoor dat strings (categorie/naam/eenheid) correct worden geciteerd en escapet
-                const row = [
-                    p.time,
-                    timeString,
-                    `"${p.category.replace(/"/g, '""')}"`,
-                    `"${p.name.replace(/"/g, '""')}"`,
-                    p.value,
-                    `"${p.unit.replace(/"/g, '""')}"`
-                ].join(',');
-                
-                csvRows.push(row);
-            });
-
-            const csvString = csvRows.join('\n');
-            
-            // 4. Download logic
-            const now = new Date();
-            const dateString = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
-            const filename = `SensorData_Export_${dateString}.csv`;
-            
-            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            
-            if (link.download !== undefined) { 
-                const url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", filename);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                showMessage(`Data van ${allDataPoints.length} punten geëxporteerd naar ${filename}`, false);
-            } else {
-                showMessage("Download is niet ondersteund in deze browser.", true);
-            }
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `export_${Date.now()}.csv`;
+            a.click();
         }
-
-
-        // Initieel de UI renderen en de vervaging aanzetten
-        updateSensorDisplays();
-        updateChartButtonState();
-        toggleDataStale(); // Start in verbroken (vervaagde) staat
-        setActiveTab('monitor'); // Start op de monitor tab
 
     </script>
 </body>
