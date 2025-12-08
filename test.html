@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamische Seriële Sensor en Configuratie</title>
-    <!-- Laad Chart.js en Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Configureer Tailwind voor 'Inter' font -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
@@ -83,28 +81,22 @@
 </head>
 <body class="min-h-screen p-4 sm:p-8">
 
-    <!-- ZWEVENDE MELDING (TOAST) -->
     <div id="toastNotification" class="hidden p-4 rounded-lg shadow-xl" role="alert">
         <p id="toastText" class="font-medium text-sm"></p>
     </div>
 
-    <!-- HOOFDCONTAINER -->
     <div class="max-w-full xl:max-w-screen-2xl mx-auto bg-white shadow-xl rounded-xl p-6 sm:p-10">
         
-        <!-- Header en Connectie Sectie -->
         <header class="mb-4 border-b pb-4">
             
-            <!-- Titel en Hoofd Connectie Knoppen -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <div>
                     <h1 class="text-3xl font-extrabold text-indigo-700">Seriële Apparaat Controller</h1>
                     <p class="text-gray-500 mt-1">Monitor en configureer uw seriële apparaat via JSON.</p>
                 </div>
                 
-                <!-- Instellingen, Status en Knoppen (Rechtsboven) -->
                 <div id="connectionControls" class="mt-4 sm:mt-0 flex items-center space-x-4">
                     
-                    <!-- Baudrate Selectie -->
                     <div id="baudRateWrapper" class="flex items-center space-x-1">
                         <label for="baudRateSelect" class="text-xs font-medium text-gray-700 whitespace-nowrap hidden lg:inline">Baud:</label>
                         <select id="baudRateSelect" class="py-1 px-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm w-24">
@@ -115,21 +107,18 @@
                         </select>
                     </div>
                     
-                    <!-- Verbindingsknop -->
                     <button id="connectButton"
                             class="px-3 py-1 bg-indigo-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 ease-in-out disabled:opacity-50"
                             onclick="connectSerialPort()">
                         Verbind
                     </button>
 
-                    <!-- Statusbericht -->
                     <div id="statusMessage" class="font-medium text-sm text-gray-600 whitespace-nowrap">
                         Klaar om te verbinden.
                     </div>
                 </div>
             </div>
             
-            <!-- Tabs (Monitor/Instellingen) -->
             <div class="flex mt-4 space-x-6">
                 <button id="tabMonitor" onclick="setActiveTab('monitor')" class="py-2 text-gray-500 hover:text-indigo-700 transition tab-active">
                     Monitor
@@ -140,10 +129,8 @@
             </div>
         </header>
 
-        <!-- Container voor Monitor Weergave -->
         <main id="monitorView" class="space-y-6">
              <div class="flex justify-start items-center space-x-4 mb-6">
-                <!-- Grafiek Deselecteren Knop -->
                 <button id="clearGraphButton"
                         class="px-3 py-1 bg-gray-400 text-white font-semibold text-sm rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50"
                         onclick="clearGraphSelection()"
@@ -151,7 +138,6 @@
                     Grafiek Deselecteren
                 </button>
 
-                <!-- Toon Grafiek Knop -->
                 <button id="openChartButton"
                         class="px-3 py-1 bg-gray-400 text-white font-semibold text-sm rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50"
                         onclick="openMultiSensorGraph()"
@@ -166,7 +152,6 @@
             </div>
         </main>
         
-        <!-- Container voor Instellingen Weergave (Nieuw) -->
         <div id="settingsView" class="hidden space-y-6">
             <div id="settingsHeader" class="flex justify-between items-center bg-gray-100 p-4 rounded-lg shadow-sm">
                 <p id="settingsStatus" class="text-sm text-gray-600">Instellingen ontvangen van apparaat. Klik op 'Update Instellingen' om wijzigingen te verzenden.</p>
@@ -187,26 +172,22 @@
 
     </div>
 
-    <!-- Modaal venster voor Grafiek -->
     <div id="graphModal" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
                 <h2 id="graphModalTitle" class="text-xl font-bold text-gray-800">Geselecteerde Sensorgrafieken</h2>
                 <button onclick="closeGraphModal()" class="p-2 rounded-full hover:bg-gray-100 transition">
-                    <!-- Close Icon -->
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x text-gray-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </div>
 
             <div class="flex justify-between items-center mb-4">
-                <!-- Tijdschaal Knoppen -->
                 <div id="timescaleButtons" class="flex justify-start space-x-2">
                     <button onclick="updateChart('60000')" data-duration="60000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-indigo-600 text-white">1 Minuut</button>
                     <button onclick="updateChart('300000')" data-duration="300000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">5 Minuten</button>
                     <button onclick="updateChart('900000')" data-duration="900000" class="px-4 py-1 rounded-lg text-sm font-medium transition duration-150 ease-in-out bg-gray-200 text-gray-700 hover:bg-gray-300">15 Minuten</button>
                 </div>
                 
-                <!-- CSV Export Knop -->
                 <button id="exportCsvButton" onclick="downloadRawSelectedData()"
                         class="px-4 py-1 bg-emerald-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-emerald-600 transition duration-150 ease-in-out disabled:opacity-50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -217,20 +198,16 @@
             </div>
 
 
-            <!-- Grafiek Canvas -->
             <div class="relative h-96">
                 <canvas id="sensorChart"></canvas>
             </div>
             
-            <!-- Legenda om kleuren te tonen -->
             <div id="chartLegend" class="mt-6 p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm">
                 <p class="font-semibold mb-2 text-gray-700">Geselecteerde Sensoren:</p>
-                <!-- Legenda items worden hier door JS ingevoegd -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- Firebase Script Imports (Verplicht, zelfs als de hoofdlogica Serial is) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -803,8 +780,7 @@
                         ${setting.label} (${id})
                     </label>
                     <div id="control-wrapper-${id}" class="flex items-center space-x-2">
-                        <!-- Besturingselement wordt hier ingevoegd -->
-                    </div>
+                        </div>
                 `;
                 
                 const controlWrapper = card.querySelector(`#control-wrapper-${id}`);
@@ -960,6 +936,28 @@
         // ----------------------------------------------------
 
         /**
+         * Stuurt een JSON-object als een JSON string, gevolgd door een newline,
+         * naar de seriële poort.
+         * @param {object} data - Het te verzenden JSON-object.
+         */
+        async function sendSerialData(data) {
+            if (!writer) {
+                showMessage("Fout: Kan geen data verzenden. Seriële poort is niet open.", true);
+                return;
+            }
+
+            const encoder = new TextEncoder();
+            const jsonString = JSON.stringify(data) + '\n';
+            
+            try {
+                await writer.write(encoder.encode(jsonString));
+                console.log(`Verzonden: ${jsonString.trim()}`);
+            } catch (e) {
+                showMessage(`Fout bij verzenden van commando: ${e.message}`, true);
+            }
+        }
+
+        /**
          * Leest data van de seriële poort.
          */
         async function readSerialPort() {
@@ -971,8 +969,8 @@
             // BAUD RATE VERBERGEN
             baudRateWrapperEl.classList.add('hidden'); 
             
-            writer = port.writable.getWriter(); // Maak een writer klaar (Nieuw)
-
+            writer = port.writable.getWriter(); // Maak een writer klaar
+            
             const textDecoder = new TextDecoderStream();
             const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
             
@@ -999,7 +997,7 @@
                     reader = null;
                 }
                 
-                if (writer) { // Sluit de writer af (Nieuw)
+                if (writer) { // Sluit de writer af
                     writer.releaseLock();
                     writer = null;
                 }
@@ -1081,6 +1079,9 @@
                 
                 readSerialPort();
                 updateSendSettingsButton();
+                
+                // 🌟 TOEVOEGING: Vraag Instellingen op na verbinding (L723) 🌟
+                await sendSerialData({ command: "REQUEST_SETTINGS" });
 
             } catch (error) {
                 connectButton.disabled = false;
