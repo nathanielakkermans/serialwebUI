@@ -855,7 +855,7 @@
             if (isOfflineMode) return;
             const def = settingsDefinition[id];
             let val = value;
-            if (def.type === 'value') val = parseFloat(value);
+            if (def.type === 'value') val = value;
             
             if (val != def.originalValue) {
                 settingsChanged.add(id);
