@@ -424,49 +424,65 @@
 
         // --- 4. VERBINDING LOGICA ---
         async function connectSerialPort() {
-            if (isOfflineMode) closeOfflineSession();
-
-            if (port) {
-                if (reader) await reader.cancel();
-                return;
+        // --- 1. VERBREKEN ---
+        if (port) {
+            // Zet de vlag UIT. De loop ziet dit en zal stoppen.
+            isConnected = false;
+            
+            // Annuleer de huidige lezer als die er is. 
+            // Dit forceert een error/done in de loop, waardoor hij checkt op isConnected.
+            if (reader) {
+                await reader.cancel().catch(() => {}); // catch negeert fouten tijdens annuleren
+                reader = null;
             }
-
-            if (!('serial' in navigator)) {
-                showToast("Web Serial API niet ondersteund.", "error");
-                return;
-            }
-
-            try {
-                els.connectBtn.disabled = true;
-                els.status.textContent = "Koppelen...";
-                
-                const baud = parseInt(document.getElementById('baudRateSelect').value);
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: baud });
-
-                els.status.textContent = "Verbonden";
-                els.connectBtn.textContent = "Verbreken";
-                els.connectBtn.classList.replace('bg-indigo-600', 'bg-red-600');
-                els.connectBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
-                els.baudWrapper.classList.add('hidden');
-                
-                toggleDataStale(false);
-                isConnected = true;
-                els.connectBtn.disabled = false;
-                
-                // Reset time tracker
-                lastPacketTime = Date.now();
-
-                readSerialLoop();
-                requestSettings();
-
-            } catch (err) {
-                console.error(err);
-                els.connectBtn.disabled = false;
-                els.status.textContent = "Fout";
-                showToast("Verbindingsfout: " + err.message, "error");
-            }
+            
+            // We hoeven port.close() hier niet te doen, dat doet de readSerialLoop
+            // automatisch zodra hij uit de loop breekt.
+            return;
         }
+
+        // --- 2. VERBINDEN ---
+        if (!('serial' in navigator)) {
+            showToast("Web Serial API niet ondersteund.", "error");
+            return;
+        }
+
+        try {
+            els.connectBtn.disabled = true;
+            els.status.textContent = "Koppelen...";
+            
+            const baud = parseInt(document.getElementById('baudRateSelect').value);
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: baud });
+
+            // Update UI
+            els.status.textContent = "Verbonden";
+            els.connectBtn.textContent = "Verbreken";
+            els.connectBtn.classList.replace('bg-indigo-600', 'bg-red-600');
+            els.connectBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
+            els.baudWrapper.classList.add('hidden');
+            
+            toggleDataStale(false);
+            isConnected = true; 
+            els.connectBtn.disabled = false;
+            
+            lastPacketTime = Date.now();
+
+            // Start de loop (zonder await, hij draait op de achtergrond)
+            readSerialLoop();
+            
+            // Vraag instellingen op
+            setTimeout(requestSettings, 500);
+
+        } catch (err) {
+            console.error(err);
+            els.connectBtn.disabled = false;
+            els.status.textContent = "Fout";
+            showToast("Verbindingsfout: " + err.message, "error");
+            isConnected = false;
+            port = null;
+        }
+    }
 
         async function requestSettings() {
             if (isOfflineMode) {
@@ -492,14 +508,14 @@
             }
         }
 
-        async function readSerialLoop() {
-        // Zolang de poort leesbaar is en we 'willen' verbinden, blijven we in deze loop
+    async function readSerialLoop() {
         while (port.readable && isConnected) {
-            
-            // We maken de stream en reader aan binnen de loop, zodat we ze kunnen herstarten bij een crash
             const textDecoder = new TextDecoderStream();
             const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-            const reader = textDecoder.readable
+            
+            // LET OP: Hier stond 'const reader'. Dat is nu weggehaald!
+            // We gebruiken nu de GLOBALE variabele 'reader' zodat de knop hem kan annuleren.
+            reader = textDecoder.readable
                 .pipeThrough(new TransformStream(new LineBreakTransformer()))
                 .getReader();
 
@@ -507,65 +523,74 @@
                 while (true) {
                     const { value, done } = await reader.read();
                     
-                    if (done) {
-                        // De stream is 'netjes' gesloten (geen error)
-                        break; 
-                    }
+                    // Check 1: Is de stream klaar?
+                    if (done) break; 
                     
+                    // Check 2: Heeft de gebruiker op 'Verbreken' geklikt tijdens het wachten?
+                    if (!isConnected) break;
+
                     if (value) {
-                        // Probeer het bericht te verwerken, negeer parse fouten
                         try {
                             handleSerialLine(value);
                         } catch (e) {
-                            console.warn("Parse error (genegeerd):", e); 
+                            // Negeer parse fouten
                         }
                     }
                 }
             } catch (error) {
-                // --- HIER ZIT DE OPLOSSING ---
-                
-                // Is het een BufferOverrun? (Te veel data voor de browser)
+                // Check 3: Is de error ontstaan omdat we op 'Verbreken' klikten?
+                if (!isConnected) break;
+
+                // Buffer fouten? (Auto-restart)
                 if (error.name === 'BufferOverrunError' || error.message.includes('Buffer')) {
-                    console.warn("Buffer liep over! We herstarten de lezer automatisch...");
-                    // We doen NIETS (geen break), zodat de outer loop gewoon opnieuw begint.
-                    // Dit werkt als een 'flush' van de data.
+                    console.warn("Buffer herstel...");
+                    // We doen niets, de outer-loop start de reader opnieuw
                 } else {
-                    // Is het een andere fout (bijv. kabel los)? Dan stoppen we wel.
                     console.error("Fatale fout:", error);
                     showToast("Fout: " + error.message, "error");
-                    break; // Verbreek de verbinding
+                    isConnected = false; // Stop de loop
+                    break; 
                 }
             } finally {
-                // Ruim de huidige reader op zodat we een nieuwe kunnen maken
+                // Lezer vrijgeven
                 reader.releaseLock();
-                // We wachten even tot de stream gesloten is, negeer errors bij het sluiten
+                reader = null; // Reset globale variabele
+                
+                // Wacht tot de stream gesloten is
                 await readableStreamClosed.catch(() => {}); 
             }
         }
         
-        // Als we hier komen, is isConnected false of is er een fatale fout geweest
-        if (isConnected) {
-            cleanUpConnection(null); 
-        }
+        // Als we hier zijn, is de loop voorbij. Tijd om op te ruimen.
+        await cleanUpConnection(null);
     }
 
         async function cleanUpConnection(readableStreamClosed) {
-            if (reader) reader.releaseLock();
-            if (writer) writer.releaseLock();
-            await readableStreamClosed.catch(() => {}); 
-            await port.close();
-            
-            port = null; reader = null; writer = null; isConnected = false;
-            
-            if (!isOfflineMode) {
-                els.status.textContent = "Niet verbonden";
-                els.connectBtn.textContent = "Verbinden";
-                els.connectBtn.classList.replace('bg-red-600', 'bg-indigo-600');
-                els.connectBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
-                els.baudWrapper.classList.remove('hidden');
-                toggleDataStale(true);
+        // Sluit de poort als dat nog niet gebeurd is
+        if (port) {
+            try {
+                await port.close();
+            } catch (e) {
+                console.log("Poort sluiten gaf een melding (niet erg):", e);
             }
         }
+
+        port = null;
+        reader = null;
+        writer = null;
+        isConnected = false;
+        
+        // UI Resetten naar "Niet verbonden"
+        if (!isOfflineMode) {
+            els.status.textContent = "Niet verbonden";
+            els.connectBtn.textContent = "Verbinden";
+            els.connectBtn.classList.replace('bg-red-600', 'bg-indigo-600');
+            els.connectBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+            els.connectBtn.disabled = false;
+            els.baudWrapper.classList.remove('hidden');
+            toggleDataStale(true);
+        }
+}
 
         // --- VERBETERDE TRANSFORMER (Ondersteunt \r, \n en \r\n) ---
         class LineBreakTransformer {
