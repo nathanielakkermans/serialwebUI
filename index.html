@@ -493,22 +493,61 @@
         }
 
         async function readSerialLoop() {
-            const decoder = new TextDecoderStream();
-            const readableStreamClosed = port.readable.pipeTo(decoder.writable);
-            reader = decoder.readable.pipeThrough(new TransformStream(new LineBreakTransformer())).getReader();
+        // Zolang de poort leesbaar is en we 'willen' verbinden, blijven we in deze loop
+        while (port.readable && isConnected) {
+            
+            // We maken de stream en reader aan binnen de loop, zodat we ze kunnen herstarten bij een crash
+            const textDecoder = new TextDecoderStream();
+            const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+            const reader = textDecoder.readable
+                .pipeThrough(new TransformStream(new LineBreakTransformer()))
+                .getReader();
 
             try {
                 while (true) {
                     const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) handleSerialLine(value);
+                    
+                    if (done) {
+                        // De stream is 'netjes' gesloten (geen error)
+                        break; 
+                    }
+                    
+                    if (value) {
+                        // Probeer het bericht te verwerken, negeer parse fouten
+                        try {
+                            handleSerialLine(value);
+                        } catch (e) {
+                            console.warn("Parse error (genegeerd):", e); 
+                        }
+                    }
                 }
-            } catch (err) {
-                console.error(err);
+            } catch (error) {
+                // --- HIER ZIT DE OPLOSSING ---
+                
+                // Is het een BufferOverrun? (Te veel data voor de browser)
+                if (error.name === 'BufferOverrunError' || error.message.includes('Buffer')) {
+                    console.warn("Buffer liep over! We herstarten de lezer automatisch...");
+                    // We doen NIETS (geen break), zodat de outer loop gewoon opnieuw begint.
+                    // Dit werkt als een 'flush' van de data.
+                } else {
+                    // Is het een andere fout (bijv. kabel los)? Dan stoppen we wel.
+                    console.error("Fatale fout:", error);
+                    showToast("Fout: " + error.message, "error");
+                    break; // Verbreek de verbinding
+                }
             } finally {
-                await cleanUpConnection(readableStreamClosed);
+                // Ruim de huidige reader op zodat we een nieuwe kunnen maken
+                reader.releaseLock();
+                // We wachten even tot de stream gesloten is, negeer errors bij het sluiten
+                await readableStreamClosed.catch(() => {}); 
             }
         }
+        
+        // Als we hier komen, is isConnected false of is er een fatale fout geweest
+        if (isConnected) {
+            cleanUpConnection(null); 
+        }
+    }
 
         async function cleanUpConnection(readableStreamClosed) {
             if (reader) reader.releaseLock();
@@ -528,28 +567,62 @@
             }
         }
 
+        // --- VERBETERDE TRANSFORMER (Ondersteunt \r, \n en \r\n) ---
         class LineBreakTransformer {
-            constructor() { this.chunks = ""; }
+            constructor() {
+                this.chunks = "";
+            }
+
             transform(chunk, controller) {
                 this.chunks += chunk;
-                const lines = this.chunks.split("\n");
+                // Split op \r\n OF \n OF \r
+                const lines = this.chunks.split(/\r\n|\n|\r/);
+                
+                // Het laatste element is waarschijnlijk incompleet, die bewaren we voor de volgende keer
                 this.chunks = lines.pop();
-                lines.forEach(line => controller.enqueue(line));
+
+                lines.forEach(line => {
+                    if (line && line.trim() !== "") {
+                        controller.enqueue(line);
+                    }
+                });
             }
-            flush(controller) { controller.enqueue(this.chunks); }
+
+            flush(controller) {
+                if (this.chunks && this.chunks.trim() !== "") {
+                    controller.enqueue(this.chunks);
+                }
+            }
         }
 
+        // --- VERBETERDE LINE HANDLING ---
         function handleSerialLine(line) {
+            // Trim spaties en vreemde whitespace karakters weg
+            const cleanLine = line.trim();
+            if (!cleanLine) return; // Lege regels negeren
+
+            // JSON parsen kan fout gaan, dus dat doen we hier veilig
+            // Let op: de try/catch in readSerialLoop vangt fouten hier ook op,
+            // maar voor de netheid doen we het hier specifiek.
             try {
-                const data = JSON.parse(line.trim());
+                // Sommige apparaten sturen soms een null-byte (\0) mee, die halen we weg
+                const jsonStr = cleanLine.replace(/\0/g, '');
+                const data = JSON.parse(jsonStr);
+
+                // Verwerk configuratie definitie
                 if (data.command === "SETTINGS_DEFINITION" && data.settings) {
                     processSettingsDefinition(data.settings);
                     return;
                 }
+                
+                // Verwerk sensor data
                 if (data.name && data.category && (data.value !== undefined || data.message !== undefined)) {
                     processSensorData(data);
                 }
-            } catch (e) { }
+            } catch (e) {
+                // Gooi de fout omhoog zodat de readSerialLoop hem als 'waarschuwing' kan loggen
+                throw new Error("Ongeldige JSON ontvangen: " + e.message);
+            }
         }
 
         // --- 5. SENSOR VERWERKING ---
