@@ -4,15 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Battery Included Configurator + Session Manager</title>
-    <!-- Laad Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <!-- Laad Hammer.js (vereist voor zoom plugin) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-    <!-- Laad Chart.js Zoom Plugin -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
-    <!-- Laad Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tailwind Config voor Dark Mode 'class' strategie -->
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -115,7 +110,6 @@
 </head>
 <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen p-4 sm:p-6 transition-colors duration-200">
 
-    <!-- TOAST NOTIFICATION -->
     <div id="toastNotification" class="hidden p-4 rounded-lg shadow-xl border-l-4 bg-white dark:bg-gray-800" role="alert">
         <div class="flex items-center">
             <div class="flex-shrink-0 mr-3" id="toastIcon"></div>
@@ -123,17 +117,13 @@
         </div>
     </div>
 
-    <!-- HIDDEN FILE INPUT VOOR IMPORT -->
     <input type="file" id="fileInput" accept=".json" class="hidden" onchange="handleFileSelect(event)" />
 
-    <!-- HOOFD CONTAINER -->
     <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6 sm:p-8 transition-colors duration-200">
         
-        <!-- HEADER -->
         <header class="mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
             <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 
-                <!-- Titel -->
                 <div>
                     <h1 class="text-3xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400">
                         Battery Included
@@ -143,19 +133,19 @@
                     </p>
                 </div>
                 
-                <!-- Controls Rechtsboven -->
                 <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                     
-                    <!-- Dark Mode Toggle -->
                     <button id="themeToggle" onclick="toggleTheme()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Wissel Dark Mode">
                         <svg id="iconSun" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                         <svg id="iconMoon" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 24.042l-1.004.996L17.5 23h-2.146L13.5 21.146v-2.292L11.646 17l1.854-1.854v-2.292l1.854-1.854H17.5L19.354 9.146l1-1 .854 1.854H23.5l1.854 1.854 1.854 1.854v2.292l-1.854 1.854v2.292l-1.854 1.854h-2.146l-1.854 1.854zM21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
                     </button>
 
-                    <!-- SEPARATOR -->
+                    <button onclick="openGlobalSettings()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Globale Instellingen">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </button>
+
                     <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
 
-                    <!-- OPSLAAN & LADEN KNOPPEN -->
                     <button onclick="exportSession()" class="flex items-center px-3 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg text-sm font-medium transition" title="Huidige sessie opslaan">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                         Opslaan
@@ -165,17 +155,15 @@
                         Laden
                     </button>
 
-                    <!-- SEPARATOR -->
                     <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
 
-                    <!-- SERIAL CONTROLS -->
                     <div id="baudRateWrapper" class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
                         <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-2">BAUD</span>
                         <select id="baudRateSelect" class="bg-transparent border-none text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer">
-                            <option value="115200" selected>115200</option>
+                            <option value="115200">115200</option>
                             <option value="9600">9600</option>
                             <option value="250000">250000</option>
-                            <option value="500000">500000</option>
+                            <option value="500000" selected>500000</option>
                             <option value="1000000">1000000</option>
                         </select>
                     </div>
@@ -184,21 +172,18 @@
                         Verbinden
                     </button>
                     
-                    <!-- OFFLINE BANNER (Standaard verborgen) -->
                     <div id="offlineBanner" class="hidden items-center px-3 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-lg border border-amber-200 dark:border-amber-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
                         <span class="text-sm font-semibold">Offline Sessie</span>
                         <button onclick="closeOfflineSession()" class="ml-3 text-xs underline hover:text-amber-900 dark:hover:text-amber-100">Sluiten</button>
                     </div>
 
-                    <!-- Status Text -->
                     <span id="statusMessage" class="hidden lg:inline-block text-sm font-medium text-gray-500 dark:text-gray-400">
                         Niet verbonden
                     </span>
                 </div>
             </div>
             
-            <!-- NAVIGATIE TABS -->
             <div class="flex mt-6 space-x-6">
                 <button id="tabMonitor" onclick="setActiveTab('monitor')" class="tab-btn tab-active pb-2 font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition">
                     Monitor
@@ -206,13 +191,14 @@
                 <button id="tabSettings" onclick="setActiveTab('settings')" class="tab-btn pb-2 font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition">
                     Instellingen
                 </button>
+                <button id="tabTerminal" onclick="setActiveTab('terminal')" class="tab-btn pb-2 font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition hidden">
+                    Terminal
+                </button>
             </div>
         </header>
 
-        <!-- ================= MONITOR VIEW ================= -->
-        <main id="monitorView" class="space-y-6">
+        <main id="monitorView" class="space-y-6 block">
             
-            <!-- Toolbar -->
             <div class="flex items-center space-x-3">
                 <button id="openChartButton" onclick="openMultiSensorGraph()" disabled class="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium text-sm rounded-md transition disabled:opacity-40">
                     Toon Grafiek (0)
@@ -222,9 +208,7 @@
                 </button>
             </div>
 
-            <!-- Grid Container -->
             <div id="sensorContainer" class="space-y-8 min-h-[300px]">
-                <!-- Placeholder -->
                 <div id="initialMessage" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
                     <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     <p class="text-gray-500 dark:text-gray-400 font-medium">Wacht op data...</p>
@@ -233,10 +217,8 @@
             </div>
         </main>
         
-        <!-- ================= SETTINGS VIEW ================= -->
         <div id="settingsView" class="hidden space-y-6">
             
-            <!-- Settings Toolbar -->
             <div class="flex flex-col sm:flex-row justify-between items-center bg-gray-50 dark:bg-gray-750 p-4 rounded-xl border border-gray-100 dark:border-gray-700 gap-4">
                 <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                     <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -254,9 +236,7 @@
                 </div>
             </div>
             
-            <!-- Settings Grid -->
             <div id="settingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Placeholder -->
                 <div id="initialSettingsMessage" class="md:col-span-3 flex flex-col items-center justify-center py-16 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
                     <p class="text-gray-500 dark:text-gray-400">Nog geen instellingen ontvangen.</p>
                     <button onclick="requestSettings()" class="mt-2 text-indigo-500 hover:underline text-sm">Klik hier om op te vragen</button>
@@ -264,9 +244,72 @@
             </div>
         </div>
 
+        <div id="terminalView" class="hidden flex-col h-[600px] border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+            <div class="bg-gray-100 dark:bg-gray-750 p-3 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 z-10 relative">
+                <span class="font-medium text-sm text-gray-700 dark:text-gray-300">Live JSON Verkeer</span>
+                <div class="flex items-center space-x-2">
+                    <button id="pauseTerminalBtn" onclick="toggleTerminalPause()" class="text-xs px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-md hover:bg-amber-200 dark:hover:bg-amber-900/50 transition font-medium w-32 text-center">Pauzeren</button>
+                    <button onclick="clearTerminal()" class="text-xs px-3 py-1.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition font-medium">Wissen</button>
+                </div>
+            </div>
+            <div id="terminalContent" class="flex-1 bg-gray-900 font-mono p-4 pb-8 overflow-y-auto text-sm">
+                </div>
+        </div>
+
     </div>
 
-    <!-- GRAFIEK MODAL -->
+    <div id="globalSettingsModal" class="modal-overlay hidden" onclick="if(event.target === this) closeGlobalSettings()">
+        <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 max-w-md w-full !p-6">
+            <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-6">
+                <h2 class="text-xl font-bold">Globale Instellingen</h2>
+                <button onclick="closeGlobalSettings()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <span class="font-medium block text-gray-800 dark:text-gray-200">Polling Interval</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Tijd tussen data requests (ms)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="pollingIntervalInput" value="1000" onchange="applyPollingSettings()" class="w-24 p-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-right focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center">
+                    <div>
+                        <span class="font-medium block text-gray-800 dark:text-gray-200">Polling Actief</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Stuur periodiek een request</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="pollingToggle" class="sr-only peer" checked onchange="togglePolling(this.checked)">
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+
+                <hr class="border-gray-200 dark:border-gray-700">
+
+                <div class="flex justify-between items-center">
+                    <div>
+                        <span class="font-medium block text-gray-800 dark:text-gray-200">Debug Terminal</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Toon tabblad voor ruwe JSON data</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="terminalToggle" class="sr-only peer" onchange="toggleTerminalTab(this.checked)">
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+            </div>
+            <div class="mt-8">
+                <button onclick="closeGlobalSettings()" class="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-medium text-sm rounded-lg transition">
+                    Sluiten
+                </button>
+            </div>
+        </div>
+    </div>
+
+
     <div id="graphModal" class="modal-overlay hidden" onclick="if(event.target === this) closeGraphModal()">
         <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
             <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
@@ -302,7 +345,6 @@
         </div>
     </div>
 
-    <!-- LOGBOEK MODAL -->
     <div id="logModal" class="modal-overlay hidden" onclick="if(event.target === this) closeLogModal()">
         <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
             <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
@@ -312,12 +354,10 @@
                 </button>
             </div>
             <div id="logContainer" class="max-h-96 overflow-y-auto space-y-2">
-                <!-- Logs worden hier dynamisch ingevoegd -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- LOGICA SCRIPT -->
     <script>
         // --- 1. THEMA / DARK MODE LOGICA ---
         function initTheme() {
@@ -379,7 +419,11 @@
         let needsRender = false;
         let renderTimeout = null;
         
-        // NIEUW: Voor chart fix
+        // Polling variabelen
+        let pollingIntervalId = null;
+        let pollingIntervalMs = 1000;
+        let isPollingActive = true;
+
         let lastPacketTime = Date.now(); 
         let isAutoScrolling = true;
 
@@ -406,31 +450,210 @@
         // --- 3. TAB LOGICA ---
         window.setActiveTab = function(tab) {
             activeTab = tab;
-            document.getElementById('monitorView').classList.toggle('hidden', tab !== 'monitor');
-            document.getElementById('settingsView').classList.toggle('hidden', tab !== 'settings');
             
+            // 1. Verberg alle weergaven expliciet
+            document.getElementById('monitorView').classList.add('hidden');
+            document.getElementById('settingsView').classList.add('hidden');
+            
+            const termView = document.getElementById('terminalView');
+            termView.classList.add('hidden');
+            termView.classList.remove('flex'); // Zorg dat flex weg is als hij verborgen is
+
+            // 2. Reset actieve status van tab-knoppen
             const btnMonitor = document.getElementById('tabMonitor');
             const btnSettings = document.getElementById('tabSettings');
+            const btnTerminal = document.getElementById('tabTerminal');
             
+            [btnMonitor, btnSettings, btnTerminal].forEach(btn => btn.classList.remove('tab-active'));
+            
+            // 3. Toon alleen de geselecteerde view en markeer de actieve tab
             if (tab === 'monitor') {
+                document.getElementById('monitorView').classList.remove('hidden');
                 btnMonitor.classList.add('tab-active');
-                btnSettings.classList.remove('tab-active');
-            } else {
-                btnMonitor.classList.remove('tab-active');
+            } else if (tab === 'settings') {
+                document.getElementById('settingsView').classList.remove('hidden');
                 btnSettings.classList.add('tab-active');
                 renderSettingsControls(); 
+            } else if (tab === 'terminal') {
+                termView.classList.remove('hidden');
+                termView.classList.add('flex'); // <--- CRUCIAAL VOOR SCROLLEN!
+                btnTerminal.classList.add('tab-active');
+                
+                if (!isTerminalPaused) {
+                    scrollToTerminalBottom();
+                }
+            }
+
+            // 4. Polling Logica afhankelijk van de actieve tab
+            if (tab === 'settings') {
+                stopPolling();
+            } else {
+                if (isConnected && isPollingActive) {
+                    startPolling();
+                }
             }
         };
 
-        // --- 4. VERBINDING LOGICA ---
+        function toggleTerminalTab(show) {
+            const tabBtn = document.getElementById('tabTerminal');
+            if(show) {
+                tabBtn.classList.remove('hidden');
+            } else {
+                tabBtn.classList.add('hidden');
+                if(activeTab === 'terminal') setActiveTab('monitor');
+            }
+        }
+
+        // --- GLOBALE SETTINGS MODAL ---
+        function openGlobalSettings() {
+            document.getElementById('globalSettingsModal').classList.remove('hidden');
+        }
+        function closeGlobalSettings() {
+            document.getElementById('globalSettingsModal').classList.add('hidden');
+        }
+
+        // --- POLLING LOGICA ---
+        function applyPollingSettings() {
+            pollingIntervalMs = parseInt(document.getElementById('pollingIntervalInput').value) || 1000;
+            if (isConnected && isPollingActive && activeTab !== 'settings') {
+                startPolling();
+            }
+        }
+
+        function startPolling() {
+            stopPolling();
+            if(isPollingActive && isConnected) {
+                pollingIntervalId = setInterval(() => {
+                    sendSerialData({ command: "POLL" }); 
+                }, pollingIntervalMs);
+            }
+        }
+
+        function stopPolling() {
+            if (pollingIntervalId) {
+                clearInterval(pollingIntervalId);
+                pollingIntervalId = null;
+            }
+        }
+        
+        function togglePolling(isActive) {
+            isPollingActive = isActive;
+            applyPollingSettings();
+        }
+
+        // --- TERMINAL LOGICA ---
+        const terminalContent = document.getElementById('terminalContent');
+        let isTerminalPaused = false;
+        let pendingLogs = []; 
+        
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        function toggleTerminalPause() {
+            isTerminalPaused = !isTerminalPaused;
+            const btn = document.getElementById('pauseTerminalBtn');
+            
+            if (isTerminalPaused) {
+                btn.textContent = "Hervatten (0)";
+                btn.classList.replace('bg-amber-100', 'bg-emerald-100');
+                btn.classList.replace('dark:bg-amber-900/30', 'dark:bg-emerald-900/30');
+                btn.classList.replace('text-amber-700', 'text-emerald-700');
+                btn.classList.replace('dark:text-amber-300', 'dark:text-emerald-300');
+            } else {
+                btn.textContent = "Pauzeren";
+                btn.classList.replace('bg-emerald-100', 'bg-amber-100');
+                btn.classList.replace('dark:bg-emerald-900/30', 'dark:bg-amber-900/30');
+                btn.classList.replace('text-emerald-700', 'text-amber-700');
+                btn.classList.replace('dark:text-emerald-300', 'dark:text-amber-300');
+                
+                // Flush de buffer naar de DOM in 1 keer
+                if (pendingLogs.length > 0) {
+                    const fragment = document.createDocumentFragment();
+                    pendingLogs.forEach(html => {
+                        const el = document.createElement('div');
+                        el.className = "py-0.5 leading-relaxed";
+                        el.innerHTML = html;
+                        fragment.appendChild(el);
+                    });
+                    terminalContent.appendChild(fragment);
+                    pendingLogs = [];
+                    
+                    trimTerminal();
+                }
+
+                if(activeTab === 'terminal') {
+                    scrollToTerminalBottom();
+                }
+            }
+        }
+
+        function scrollToTerminalBottom() {
+            requestAnimationFrame(() => {
+                terminalContent.scrollTop = terminalContent.scrollHeight + 100;
+            });
+        }
+
+        function trimTerminal() {
+            if (terminalContent.childElementCount > 1050) {
+                for (let i = 0; i < 50; i++) {
+                    if (terminalContent.firstChild) {
+                        terminalContent.removeChild(terminalContent.firstChild);
+                    }
+                }
+            }
+        }
+
+        function logDebug(dir, msg) {
+            const time = new Date().toISOString().split('T')[1].slice(0, 12); 
+            const htmlString = `<span class="${dir === 'IN' ? 'text-blue-400' : 'text-orange-400'}">[${time}] ${dir}:</span> <span class="text-gray-200">${escapeHTML(msg)}</span>`;
+            
+            if (isTerminalPaused) {
+                pendingLogs.push(htmlString);
+                if (pendingLogs.length > 1000) pendingLogs.shift();
+                
+                const btn = document.getElementById('pauseTerminalBtn');
+                btn.textContent = `Hervatten (${pendingLogs.length})`;
+                return; 
+            }
+            
+            const el = document.createElement('div');
+            el.className = "py-0.5 leading-relaxed"; 
+            el.innerHTML = htmlString;
+            terminalContent.appendChild(el);
+            
+            trimTerminal();
+            
+            if(activeTab === 'terminal') {
+                scrollToTerminalBottom();
+            }
+        }
+
+        function clearTerminal() {
+            terminalContent.innerHTML = '';
+            pendingLogs = [];
+            if(isTerminalPaused) {
+                document.getElementById('pauseTerminalBtn').textContent = "Hervatten (0)";
+            }
+        }
+
+        // --- 4. VERBINDING LOGICA (Geüpdatet met jouw optimalisaties) ---
         async function connectSerialPort() {
             if (isOfflineMode) closeOfflineSession();
 
+            // --- 1. VERBREKEN ---
             if (port) {
-                if (reader) await reader.cancel();
+                isConnected = false;
+                if (reader) {
+                    await reader.cancel().catch(() => {});
+                    reader = null;
+                }
                 return;
             }
 
+            // --- 2. VERBINDEN ---
             if (!('serial' in navigator)) {
                 showToast("Web Serial API niet ondersteund.", "error");
                 return;
@@ -454,17 +677,25 @@
                 isConnected = true;
                 els.connectBtn.disabled = false;
                 
-                // Reset time tracker
                 lastPacketTime = Date.now();
 
+                // Start de loop
                 readSerialLoop();
-                requestSettings();
+                
+                // Vraag instellingen op met een kleine delay
+                setTimeout(requestSettings, 500);
+                
+                if(activeTab !== 'settings') {
+                    startPolling();
+                }
 
             } catch (err) {
                 console.error(err);
                 els.connectBtn.disabled = false;
                 els.status.textContent = "Fout";
                 showToast("Verbindingsfout: " + err.message, "error");
+                isConnected = false;
+                port = null;
             }
         }
 
@@ -481,11 +712,15 @@
             if (!port || !port.writable) return;
             if (!writer) writer = port.writable.getWriter();
             
+            // Log naar terminal
+            logDebug('OUT', JSON.stringify(data)); 
+
             try {
                 const enc = new TextEncoder();
                 await writer.write(enc.encode(JSON.stringify(data) + '\n'));
             } catch (e) {
                 console.error("Send error", e);
+                logDebug('OUT_ERR', e.message);
             } finally {
                 writer.releaseLock();
                 writer = null;
@@ -493,70 +728,135 @@
         }
 
         async function readSerialLoop() {
-            const decoder = new TextDecoderStream();
-            const readableStreamClosed = port.readable.pipeTo(decoder.writable);
-            reader = decoder.readable.pipeThrough(new TransformStream(new LineBreakTransformer())).getReader();
+            while (port && port.readable && isConnected) {
+                const textDecoder = new TextDecoderStream();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                
+                reader = textDecoder.readable
+                    .pipeThrough(new TransformStream(new LineBreakTransformer()))
+                    .getReader();
 
-            try {
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) handleSerialLine(value);
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        
+                        if (done) break; 
+                        if (!isConnected) break;
+
+                        if (value) {
+                            try {
+                                handleSerialLine(value);
+                            } catch (e) {
+                                // Negeer parse fouten, al opgevangen en gelogd in handleSerialLine
+                            }
+                        }
+                    }
+                } catch (error) {
+                    if (!isConnected) break;
+
+                    if (error.name === 'BufferOverrunError' || (error.message && error.message.includes('Buffer'))) {
+                        console.warn("Buffer herstel...");
+                        logDebug('SYS_WARN', "Buffer overrun herstel...");
+                    } else {
+                        console.error("Fatale fout:", error);
+                        logDebug('SYS_ERR', error.message);
+                        showToast("Fout: " + error.message, "error");
+                        isConnected = false; 
+                        break; 
+                    }
+                } finally {
+                    if(reader) {
+                        reader.releaseLock();
+                        reader = null; 
+                    }
+                    await readableStreamClosed.catch(() => {}); 
                 }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                await cleanUpConnection(readableStreamClosed);
             }
+            
+            await cleanUpConnection(null);
         }
 
         async function cleanUpConnection(readableStreamClosed) {
-            if (reader) reader.releaseLock();
-            if (writer) writer.releaseLock();
-            await readableStreamClosed.catch(() => {}); 
-            await port.close();
-            
-            port = null; reader = null; writer = null; isConnected = false;
+            if (port) {
+                try {
+                    await port.close();
+                } catch (e) {
+                    console.log("Poort sluiten gaf een melding (niet erg):", e);
+                }
+            }
+
+            port = null;
+            reader = null;
+            writer = null;
+            isConnected = false;
+            stopPolling();
             
             if (!isOfflineMode) {
                 els.status.textContent = "Niet verbonden";
                 els.connectBtn.textContent = "Verbinden";
                 els.connectBtn.classList.replace('bg-red-600', 'bg-indigo-600');
                 els.connectBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+                els.connectBtn.disabled = false;
                 els.baudWrapper.classList.remove('hidden');
                 toggleDataStale(true);
             }
         }
 
+        // --- VERBETERDE TRANSFORMER ---
         class LineBreakTransformer {
-            constructor() { this.chunks = ""; }
+            constructor() {
+                this.chunks = "";
+            }
+
             transform(chunk, controller) {
                 this.chunks += chunk;
-                const lines = this.chunks.split("\n");
+                const lines = this.chunks.split(/\r\n|\n|\r/);
                 this.chunks = lines.pop();
-                lines.forEach(line => controller.enqueue(line));
+
+                lines.forEach(line => {
+                    if (line && line.trim() !== "") {
+                        controller.enqueue(line);
+                    }
+                });
             }
-            flush(controller) { controller.enqueue(this.chunks); }
+
+            flush(controller) {
+                if (this.chunks && this.chunks.trim() !== "") {
+                    controller.enqueue(this.chunks);
+                }
+            }
         }
 
+        // --- VERBETERDE LINE HANDLING ---
         function handleSerialLine(line) {
+            const cleanLine = line.trim();
+            if (!cleanLine) return; 
+
+            // Log naar terminal
+            logDebug('IN', cleanLine); 
+
             try {
-                const data = JSON.parse(line.trim());
+                const jsonStr = cleanLine.replace(/\0/g, '');
+                const data = JSON.parse(jsonStr);
+
                 if (data.command === "SETTINGS_DEFINITION" && data.settings) {
                     processSettingsDefinition(data.settings);
                     return;
                 }
+                
                 if (data.name && data.category && (data.value !== undefined || data.message !== undefined)) {
                     processSensorData(data);
                 }
-            } catch (e) { }
+            } catch (e) {
+                logDebug('PARSE_ERR', "Ongeldige JSON: " + e.message);
+                throw new Error("Ongeldige JSON ontvangen: " + e.message);
+            }
         }
 
         // --- 5. SENSOR VERWERKING ---
         function processSensorData(data) {
             if (isOfflineMode) return; 
 
-            // Update timestamp van laatste data pakket
             lastPacketTime = Date.now();
 
             const isMsg = data.message !== undefined;
@@ -666,6 +966,7 @@
 
                     if (isNum) {
                         const valEl = document.getElementById(`val-${id}`);
+                        // Jouw aanpassing voor numerieke afronding .toFixed(2)
                         if (valEl.textContent != val) valEl.textContent = typeof val === 'number' ? val.toFixed(2).replace(/[.,]00$/, "") : val;
                         
                         const iconEl = document.getElementById(`icon-${id}`);
@@ -797,7 +1098,6 @@
             updateGraphButtons();
         }
 
-
         // --- 7. SETTINGS LOGICA ---
         function processSettingsDefinition(newSettings) {
             newSettings.forEach(s => {
@@ -818,7 +1118,7 @@
                 if (!card) {
                     card = document.createElement('div');
                     card.id = `card-${setting.id}`;
-                    card.className = "bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors";
+                    card.className = "bg-white dark:bg-gray-750 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors flex flex-col justify-between";
                     
                     let inputHtml = '';
                     const disabledAttr = isOfflineMode ? 'disabled' : '';
@@ -830,16 +1130,29 @@
                     } else {
                         const type = setting.type === 'value' ? 'number' : 'text';
                         const step = setting.step || 'any';
+                        const minAttr = setting.min !== undefined ? `min="${setting.min}"` : '';
+                        const maxAttr = setting.max !== undefined ? `max="${setting.max}"` : '';
+                        
                         inputHtml = `<div class="relative">
-                            <input type="${type}" id="${elId}" step="${step}" ${disabledAttr} onchange="handleSettingChange('${setting.id}', this.value)" class="block w-full p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white ${opacityClass}">
+                            <input type="${type}" id="${elId}" step="${step}" ${minAttr} ${maxAttr} ${disabledAttr} onchange="handleSettingChange('${setting.id}', this.value)" class="block w-full p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white ${opacityClass}">
                             ${setting.unit ? `<div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500 text-sm">${setting.unit}</div>` : ''}
                         </div>`;
                     }
 
+                    let limitText = '';
+                    if (setting.min !== undefined || setting.max !== undefined) {
+                        limitText = `<span>Min: ${setting.min !== undefined ? setting.min : '-'} | Max: ${setting.max !== undefined ? setting.max : '-'}</span>`;
+                    }
+
                     card.innerHTML = `
-                        <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">${setting.label}</label>
-                        ${inputHtml}
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">ID: ${setting.id}</p>
+                        <div>
+                            <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">${setting.label}</label>
+                            ${inputHtml}
+                        </div>
+                        <div class="mt-2 flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                            <span>ID: ${setting.id}</span>
+                            ${limitText}
+                        </div>
                     `;
                     container.appendChild(card);
                 }
@@ -855,7 +1168,18 @@
             if (isOfflineMode) return;
             const def = settingsDefinition[id];
             let val = value;
-            if (def.type === 'value') val = value;
+
+            if (def.type === 'value') {
+                val = parseFloat(value);
+                
+                if (def.min !== undefined && val < def.min) val = def.min;
+                if (def.max !== undefined && val > def.max) val = def.max;
+                
+                const inputEl = document.getElementById(`input-${id}`);
+                if (inputEl && parseFloat(inputEl.value) !== val) {
+                    inputEl.value = val;
+                }
+            }
             
             if (val != def.originalValue) {
                 settingsChanged.add(id);
@@ -886,6 +1210,8 @@
                 await sendSerialData({ command: "SET", id: id, value: setting.value });
                 setting.originalValue = setting.value; 
                 document.getElementById(`card-${id}`).classList.remove('setting-changed');
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
             settingsChanged.clear();
             updateSendButton();
@@ -932,7 +1258,6 @@
             document.getElementById('graphModal').classList.remove('hidden');
             if (!activeChart) initChart();
             
-            // Reset state bij openen
             isAutoScrolling = true;
             updateTimeButtonsUI();
 
@@ -992,7 +1317,6 @@
                     interaction: { mode: 'index', intersect: false },
                     plugins: { 
                         legend: { display: false },
-                        // ZOOM Config
                         zoom: {
                             pan: {
                                 enabled: true,
@@ -1032,7 +1356,7 @@
         }
 
         function updateChart(duration) {
-            isAutoScrolling = true; // Knoppen resetten zoom modus
+            isAutoScrolling = true; 
             
             if (duration !== 'all') {
                 currentDuration = parseInt(duration);
@@ -1044,7 +1368,6 @@
         }
 
         function updateTimeButtonsUI() {
-            // Update buttons
             document.querySelectorAll('#timescaleButtons button').forEach(btn => {
                 const isActive = isAutoScrolling && 
                                  ((currentDuration === 'all' && btn.dataset.duration === 'all') || 
@@ -1059,7 +1382,6 @@
                 }
             });
 
-            // Toon Zoom indicator
             if (!isAutoScrolling) {
                 els.zoomStatus.classList.remove('hidden');
             } else {
@@ -1070,10 +1392,8 @@
         function updateChartFromHistory() {
             if (!activeChart) return;
 
-            // Bepaal de 'huidige' tijd voor de grafiek (het rechter eindpunt)
             let endTime;
             if (isOfflineMode) {
-                // Offline: zoek max tijd in dataset
                 let maxT = 0;
                 selectedSensors.forEach(sel => {
                     const sData = sensorData[sel.category]?.find(s => s.name === sel.name);
@@ -1084,11 +1404,8 @@
                 });
                 endTime = maxT || Date.now();
             } else if (isConnected) {
-                // Verbonden: Huidige tijd
                 endTime = Date.now();
             } else {
-                // Verbroken (niet offline modus): Laatste datapakket tijd
-                // Dit zorgt ervoor dat de grafiek stopt met 'lopen'
                 endTime = lastPacketTime || Date.now();
             }
 
@@ -1101,8 +1418,6 @@
                 const sData = sensorData[sel.category]?.find(s => s.name === sel.name);
                 if (!sData) return;
 
-                // Als we auto-scrollen, filteren we data voor prestaties (optioneel, maar goed voor DOM)
-                // Als we zoomen, geven we liever alles (chartjs handelt view af), of we filteren ruim
                 const pts = sData.history; 
                 
                 datasets.push({
@@ -1117,8 +1432,6 @@
 
             activeChart.data.datasets = datasets;
             
-            // ALLEEN schalen aanpassen als we in auto-scroll modus zitten.
-            // Als de gebruiker zoomt, laten we Chart.js de schalen beheren.
             if (isAutoScrolling) {
                 if (currentDuration === 'all') {
                     delete activeChart.options.scales.x.min;
@@ -1144,7 +1457,7 @@
             els.toast.classList.add('show');
             
             let color = 'border-blue-500';
-            let icon = '<svg class="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+            let icon = '<svg class="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
             
             if (type === 'error') {
                 color = 'border-red-500';
